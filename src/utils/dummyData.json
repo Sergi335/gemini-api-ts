@@ -1,0 +1,36 @@
+{
+  "categories": [
+    {
+      "_id": "60d5ec49f8c7b8001c8c4c4c",
+      "name": "Category 1",
+      "user": "test@example.com",
+      "order": 0,
+      "level": 0
+    },
+    {
+      "_id": "60d5ec49f8c7b8001c8c4c4d",
+      "name": "Subcategory 1.1",
+      "parentCategory": "60d5ec49f8c7b8001c8c4c4c",
+      "user": "test@example.com",
+      "order": 0,
+      "level": 1
+    }
+  ],
+  "links": [
+    {
+      "_id": "60d5ec49f8c7b8001c8c4c4e",
+      "name": "Example Link",
+      "description": "A description",
+      "URL": "https://example.com",
+      "imgURL": "",
+      "categoryId": "60d5ec49f8c7b8001c8c4c4d",
+      "order": 0,
+      "user": "test@example.com",
+      "notes": "",
+      "images": [],
+      "bookmark": false,
+      "bookmarkOrder": 0,
+      "readlist": false
+    }
+  ]
+}
