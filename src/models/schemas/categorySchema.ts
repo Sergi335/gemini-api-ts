@@ -4,7 +4,7 @@ const CategorySchema = new Schema({
   name: {
     type: String
   },
-  idParent: {
+  parentId: {
     type: String
   },
   isEmpty: {
@@ -19,6 +19,13 @@ const CategorySchema = new Schema({
   slug: {
     type: String,
     unique: true
+  },
+  hidden: {
+    type: Boolean,
+    default: false
+  },
+  displayName: {
+    type: String
   }
 }, {
   timestamps: true,
