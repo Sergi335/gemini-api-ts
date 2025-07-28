@@ -7,3 +7,7 @@ yarn-error.log*
 .DS_Store
 *.sqlite
 *.sqlite-journal
+
+# Data backup files
+*dataBackup.json
+*DataBackup.json

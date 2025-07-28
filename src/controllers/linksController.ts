@@ -1,18 +1,12 @@
 import { linkModel } from '../models/linkModel'
-import { Request, Response } from 'express'
+import { Response } from 'express'
 import { validateLink, validatePartialLink } from '../validation/linksZodSchema'
 import { getLinkNameByUrlLocal, getLinkStatusLocal } from '../utils/linksUtils'
-interface User {
-  name: string
-  // add other user properties if needed
-}
+import { AuthenticatedRequest } from '../types/express'
 
-interface RequestWithUser extends Request {
-  user: User
-}
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class linksController {
-  static async getAllLinks (req: RequestWithUser, res: Response): Promise<Response> {
+  static async getAllLinks (req: AuthenticatedRequest, res: Response): Promise<Response> {
     try {
       const user = req.user?.name ?? 'SergioSR'
       const data = await linkModel.getAllLinks({ user })
@@ -22,7 +16,7 @@ export class linksController {
     }
   }
 
-  static async getLinkById (req: RequestWithUser, res: Response): Promise<Response> {
+  static async getLinkById (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const user = req.user.name
     console.log(req.params)
     console.log('Entramos en by id')
@@ -34,7 +28,7 @@ export class linksController {
     }
   }
 
-  static async getLinksByTopCategory (req: RequestWithUser, res: Response): Promise<Response> {
+  static async getAllLinksByCategory (req: AuthenticatedRequest, res: Response): Promise<Response> {
     console.log(req.user)
     const user = req.user.name
     console.log('Entramos en by desktop')
@@ -48,7 +42,7 @@ export class linksController {
     }
   }
 
-  static async getLinksCount (req: RequestWithUser, res: Response): Promise<Response> {
+  static async getLinksCount (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const user = req.user.name
     try {
       const category = typeof req.query.category === 'string' ? req.query.category : undefined
@@ -59,7 +53,7 @@ export class linksController {
     }
   }
 
-  static async createLink (req: RequestWithUser, res: Response): Promise<Response> {
+  static async createLink (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const user = req.user.name
     const [item] = req.body.data // Esto peta si no es iterable
     item.user = user
@@ -81,7 +75,7 @@ export class linksController {
     }
   }
 
-  static async updateLink (req: RequestWithUser, res: Response): Promise<Response> {
+  static async updateLink (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const user = req.user.name
     console.log(req.body)
     const item = req.body.fields
@@ -107,7 +101,7 @@ export class linksController {
     }
   }
 
-  static async deleteLink (req: RequestWithUser, res: Response): Promise<Response> {
+  static async deleteLink (req: AuthenticatedRequest, res: Response): Promise<Response> {
     console.log(req.body.linkId)
     try {
       const user = req.user.name
@@ -122,7 +116,7 @@ export class linksController {
     }
   }
 
-  static async bulkMoveLinks (req: RequestWithUser, res: Response): Promise<Response> {
+  static async bulkMoveLinks (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const user = req.user.name
     const { source, destiny, panel, links, escritorio } = req.body
     try {
@@ -133,25 +127,25 @@ export class linksController {
     }
   }
 
-  static async getLinkNameByUrl (req: RequestWithUser, res: Response): Promise<Response> {
+  static async getLinkNameByUrl (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const url = typeof req.query.url === 'string' ? req.query.url : ''
     const data = await getLinkNameByUrlLocal({ url })
     return res.send(data)
   }
 
-  static async getLinkStatus (req: RequestWithUser, res: Response): Promise<Response> {
+  static async getLinkStatus (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const url = typeof req.query.url === 'string' ? req.query.url : ''
     const data = await getLinkStatusLocal({ url })
     return res.send(data)
   }
 
-  static async findDuplicateLinks (req: RequestWithUser, res: Response): Promise<Response> {
+  static async findDuplicateLinks (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const user = req.user.name
     const data = await linkModel.findDuplicateLinks({ user })
     return res.send(data)
   }
 
-  static async setBookMarksOrder (req: RequestWithUser, res: Response): Promise<Response> {
+  static async setBookMarksOrder (req: AuthenticatedRequest, res: Response): Promise<Response> {
     const user = req.user.name
     const { links } = req.body
     console.log('🚀 ~ linksController ~ setBookMarksOrder ~ links:', links)

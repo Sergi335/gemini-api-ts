@@ -26,6 +26,10 @@ const CategorySchema = new Schema({
   },
   displayName: {
     type: String
+  },
+  level: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true,

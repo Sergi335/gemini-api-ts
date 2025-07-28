@@ -27,7 +27,10 @@ const categoryZodSchema = z.object({
   }).optional().default(false),
   displayName: z.string({
     invalid_type_error: 'DisplayName must be a string'
-  }).min(1, 'DisplayName must have at least 1 character').max(250, 'DisplayName must not exceed 250 characters').optional()
+  }).min(1, 'DisplayName must have at least 1 character').max(250, 'DisplayName must not exceed 250 characters').optional(),
+  level: z.number({
+    invalid_type_error: 'Level must be a number'
+  }).int('Level must be an integer').min(0, 'Level must be non-negative').max(10, 'Level must not exceed 10').optional().default(0)
 })
 
 // Esquema para crear categoría (requiere campos obligatorios)

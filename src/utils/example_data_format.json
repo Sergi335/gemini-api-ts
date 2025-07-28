@@ -1,0 +1,81 @@
+{
+  "ejemplo_formato_escritorios": {
+    "escritorios": [
+      {
+        "id": "escritorio_1",
+        "name": "Desarrollo",
+        "categories": [
+          {
+            "id": "cat_1",
+            "name": "Frameworks",
+            "order": 0,
+            "links": [
+              {
+                "id": "link_1",
+                "name": "React",
+                "URL": "https://reactjs.org",
+                "description": "Framework para interfaces de usuario",
+                "order": 0,
+                "bookmark": true
+              }
+            ]
+          }
+        ],
+        "links": [
+          {
+            "id": "link_2",
+            "name": "GitHub",
+            "URL": "https://github.com",
+            "description": "Repositorio de código",
+            "order": 0
+          }
+        ]
+      }
+    ]
+  },
+  "ejemplo_formato_plano": {
+    "categories": [
+      {
+        "id": "cat_1",
+        "name": "Programación",
+        "desktop": "Trabajo",
+        "order": 0
+      },
+      {
+        "id": "cat_2",
+        "name": "Diseño",
+        "desktop": "Trabajo",
+        "order": 1
+      }
+    ],
+    "links": [
+      {
+        "id": "link_1",
+        "name": "Stack Overflow",
+        "URL": "https://stackoverflow.com",
+        "category": "cat_1",
+        "order": 0
+      },
+      {
+        "id": "link_2",
+        "name": "Figma",
+        "URL": "https://figma.com",
+        "category": "cat_2",
+        "order": 0
+      }
+    ]
+  },
+  "instrucciones": {
+    "como_usar": [
+      "1. Reemplaza este archivo con tus datos reales",
+      "2. Usa uno de los formatos de ejemplo mostrados arriba",
+      "3. Ejecuta: npm run convert-data",
+      "4. Revisa el archivo convertedData.json generado"
+    ],
+    "formatos_soportados": [
+      "formato_escritorios: Datos agrupados por escritorios",
+      "formato_plano: Categorías y links en arrays separados",
+      "formato_directo: Ya en formato jerárquico (solo limpieza)"
+    ]
+  }
+}

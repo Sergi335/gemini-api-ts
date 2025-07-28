@@ -6,8 +6,8 @@ import { AuthenticatedRequest } from '../types/express'
 
 export class categoriesController {
   static async getAllCategories (req: AuthenticatedRequest, res: Response): Promise<Response> {
+    const user = req.user.name
     try {
-      const user = req.user.name
       const data = await categoryModel.getAllCategories({ user })
       return res.status(200).json({ status: 'success', data })
     } catch (error) {

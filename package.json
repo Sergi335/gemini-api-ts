@@ -7,10 +7,13 @@
     "dev": "cross-env NODE_ENV=test ts-node-dev src/app.ts",
     "production": "cross-env NODE_ENV=production ts-node-dev src/app.ts",
     "tsc": "tsc",
-    "start": "node build/index.js",
+    "start": "node dist/app.js",
     "lint": "ts-standard",
     "lint:fix": "ts-standard --fix",
-    "test": "vitest"
+    "test": "vitest",
+    "convert-data": "ts-node src/utils/convertData.ts",
+    "import-data": "ts-node src/utils/dataImporter.ts",
+    "import-data-overwrite": "ts-node src/utils/dataImporter.ts --overwrite"
   },
   "keywords": [],
   "author": "",

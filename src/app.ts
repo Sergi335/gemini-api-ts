@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import cookieParser from 'cookie-parser'
 import cors from './middlewares/cors'
 import { dbConnect } from './config/mongodb'
+import { categoriesRouter } from './routes/categories/categories'
 
 dotenv.config()
 
@@ -17,6 +18,7 @@ app.use(cookieParser())
 app.get('/', (_: Request, res: Response) => {
   res.send('Hello World!')
 })
+app.use('/api/categories', categoriesRouter)
 const port = process.env.PORT ?? 3000
 void (async () => {
   await dbConnect()

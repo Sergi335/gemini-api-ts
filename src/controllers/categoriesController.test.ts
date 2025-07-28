@@ -3,6 +3,7 @@ import { Request, Response } from 'express'
 import { categoriesController } from './categoriesController'
 import { categoryModel } from '../models/categoryModel'
 import { validateCreateCategory, validateUpdateCategory } from '../validation/categoriesZodSchema'
+import { AuthenticatedRequest } from '../types/express'
 
 // Mock del categoryModel
 vi.mock('../models/categoryModel')
@@ -77,7 +78,7 @@ describe('categoriesController', () => {
     })
   })
 
-  describe('createColumn', () => {
+  describe('createCategory', () => {
     beforeEach(() => {
       mockRequest.body = {
         name: 'New Category',
@@ -105,8 +106,8 @@ describe('categoriesController', () => {
       vi.mocked(validateCreateCategory).mockReturnValue(mockValidationResult as any)
       vi.mocked(categoryModel.createCategory).mockResolvedValue([mockCreatedCategory] as any)
 
-      await categoriesController.createColumn(
-        mockRequest as RequestWithUser,
+      await categoriesController.createCategory(
+        mockRequest as AuthenticatedRequest,
         mockResponse as Response
       )
 
@@ -122,7 +123,7 @@ describe('categoriesController', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(201)
       expect(mockResponse.json).toHaveBeenCalledWith({
         status: 'success',
-        column: [mockCreatedCategory]
+        category: [mockCreatedCategory]
       })
     })
 
@@ -139,7 +140,7 @@ describe('categoriesController', () => {
 
       vi.mocked(validateCreateCategory).mockReturnValue(mockValidationResult as any)
 
-      await categoriesController.createColumn(
+      await categoriesController.createCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -167,7 +168,7 @@ describe('categoriesController', () => {
       vi.mocked(validateCreateCategory).mockReturnValue(mockValidationResult as any)
       vi.mocked(categoryModel.createCategory).mockRejectedValue(error)
 
-      await categoriesController.createColumn(
+      await categoriesController.createCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -210,7 +211,7 @@ describe('categoriesController', () => {
       vi.mocked(validateUpdateCategory).mockReturnValue(mockValidationResult as any)
       vi.mocked(categoryModel.updateCategory).mockResolvedValue(mockUpdatedCategory as any)
 
-      await categoriesController.updateColumn(
+      await categoriesController.updateCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -253,7 +254,7 @@ describe('categoriesController', () => {
       vi.mocked(validateUpdateCategory).mockReturnValue(mockValidationResult as any)
       vi.mocked(categoryModel.updateCategory).mockResolvedValue(mockUpdatedCategory as any)
 
-      await categoriesController.updateColumn(
+      await categoriesController.updateCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -278,7 +279,7 @@ describe('categoriesController', () => {
 
       vi.mocked(validateUpdateCategory).mockReturnValue(mockValidationResult as any)
 
-      await categoriesController.updateColumn(
+      await categoriesController.updateCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -305,7 +306,7 @@ describe('categoriesController', () => {
       vi.mocked(validateUpdateCategory).mockReturnValue(mockValidationResult as any)
       vi.mocked(categoryModel.updateCategory).mockRejectedValue(error)
 
-      await categoriesController.updateColumn(
+      await categoriesController.updateCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -334,7 +335,7 @@ describe('categoriesController', () => {
 
       vi.mocked(categoryModel.deleteCategory).mockResolvedValue(mockDeletedCategory as any)
 
-      await categoriesController.deleteColumn(
+      await categoriesController.deleteCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -355,7 +356,7 @@ describe('categoriesController', () => {
 
       vi.mocked(categoryModel.deleteCategory).mockRejectedValue(error)
 
-      await categoriesController.deleteColumn(
+      await categoriesController.deleteCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -384,7 +385,7 @@ describe('categoriesController', () => {
       vi.mocked(validateUpdateCategory).mockReturnValue(mockValidationResult as any)
       vi.mocked(categoryModel.updateCategory).mockResolvedValue({} as any)
 
-      await categoriesController.updateColumn(
+      await categoriesController.updateCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )
@@ -412,7 +413,7 @@ describe('categoriesController', () => {
       vi.mocked(validateUpdateCategory).mockReturnValue(mockValidationResult as any)
       vi.mocked(categoryModel.updateCategory).mockResolvedValue({} as any)
 
-      await categoriesController.updateColumn(
+      await categoriesController.updateCategory(
         mockRequest as RequestWithUser,
         mockResponse as Response
       )

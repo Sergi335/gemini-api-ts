@@ -6,6 +6,7 @@ export type CategoryCleanData = Omit<{
   hidden?: boolean
   displayName?: string
   slug?: string
+  level?: number
 }, 'user'>
 
 export interface MoveCategoryResponse {
