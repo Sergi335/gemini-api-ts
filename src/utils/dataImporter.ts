@@ -10,7 +10,7 @@ import path from 'path'
 import { MongoClient, Db } from 'mongodb'
 
 // URI de conexión directa a la base de datos de desarrollo
-const DB_URI_TEST = 'mongodb+srv://sergiadn335:odthG7LKmcR2gqi8@cluster1.eiw7kyo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1'
+const DB_URI_TEST = process.env.DB_URI_TEST ?? 'mongodb+srv://sergiadn335:'
 
 interface ImportData {
   categories: any[]

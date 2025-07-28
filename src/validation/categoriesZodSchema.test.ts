@@ -176,7 +176,8 @@ describe('categoriesZodSchema', () => {
         user: 'user',
         parentId: 'parent',
         order: 1,
-        hidden: false
+        hidden: false,
+        level: 0
       }
 
       expect(createData.name).toBe('Test')

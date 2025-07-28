@@ -1,6 +1,9 @@
 import mongoose from 'mongoose'
 
 export const dbConnect = async (): Promise<void> => {
+  // Configurar strictQuery para evitar el warning de deprecación
+  mongoose.set('strictQuery', true)
+
   const { DB_URI, DB_URI_TEST, NODE_ENV } = process.env
   const connectionString = NODE_ENV === 'test'
     ? DB_URI_TEST

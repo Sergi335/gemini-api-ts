@@ -3,7 +3,6 @@ import { Request, Response } from 'express'
 import { categoriesController } from './categoriesController'
 import { categoryModel } from '../models/categoryModel'
 import { validateCreateCategory, validateUpdateCategory } from '../validation/categoriesZodSchema'
-import { AuthenticatedRequest } from '../types/express'
 
 // Mock del categoryModel
 vi.mock('../models/categoryModel')
@@ -17,7 +16,7 @@ interface User {
 }
 
 interface RequestWithUser extends Request {
-  user: User
+  user?: User
 }
 
 describe('categoriesController', () => {
@@ -107,7 +106,7 @@ describe('categoriesController', () => {
       vi.mocked(categoryModel.createCategory).mockResolvedValue([mockCreatedCategory] as any)
 
       await categoriesController.createCategory(
-        mockRequest as AuthenticatedRequest,
+        mockRequest as RequestWithUser,
         mockResponse as Response
       )
 

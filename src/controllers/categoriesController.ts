@@ -1,13 +1,14 @@
 import { categoryModel } from '../models/categoryModel'
 import { Response } from 'express'
 import { validateCreateCategory, validateUpdateCategory } from '../validation/categoriesZodSchema'
-import { AuthenticatedRequest } from '../types/express'
+import { RequestWithUser } from '../types/express'
+
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 
 export class categoriesController {
-  static async getAllCategories (req: AuthenticatedRequest, res: Response): Promise<Response> {
+  static async getAllCategories (req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const user = req.user.name
+      const user = req.user?.name ?? 'SergioSR'
       const data = await categoryModel.getAllCategories({ user })
       return res.status(200).json({ status: 'success', data })
     } catch (error) {
@@ -15,8 +16,8 @@ export class categoriesController {
     }
   }
 
-  static async createCategory (req: AuthenticatedRequest, res: Response): Promise<Response> {
-    const user = req.user.name
+  static async createCategory (req: RequestWithUser, res: Response): Promise<Response> {
+    const user = req.user?.name ?? 'SergioSR'
     req.body.user = user
     const validatedCol = validateCreateCategory(req.body)
     // Crear mensaje de error
@@ -35,9 +36,9 @@ export class categoriesController {
     }
   }
 
-  static async updateCategory (req: AuthenticatedRequest, res: Response): Promise<Response> {
+  static async updateCategory (req: RequestWithUser, res: Response): Promise<Response> {
     // El id no se valida, los columnsids tampoco
-    const user = req.user.name
+    const user = req.user?.name ?? 'SergioSR'
     const { fields, id } = req.body
     let elements
     if (typeof req.body.columnsIds !== 'undefined' && req.body.columnsIds !== null) {
@@ -62,8 +63,8 @@ export class categoriesController {
     }
   }
 
-  static async deleteCategory (req: AuthenticatedRequest, res: Response): Promise<Response> {
-    const user = req.user.name
+  static async deleteCategory (req: RequestWithUser, res: Response): Promise<Response> {
+    const user = req.user?.name ?? 'SergioSR'
     const id = req.body.id
     try {
       const column = await categoryModel.deleteCategory({ id, user })
