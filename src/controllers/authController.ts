@@ -47,7 +47,7 @@ export class usersController {
     if (req.body.email !== undefined && req.body.email !== null && req.body.email !== '') {
       const user = await userModel.getUser({ email: req.body.email })
       console.log(user)
-      if (user._id !== undefined && user._id !== null) {
+      if (!('error' in user) && user._id !== undefined && user._id !== null) {
         res.send(user)
       } else {
         const googleUser = await getAuth().getUser(req.body.uid)
@@ -64,7 +64,7 @@ export class usersController {
           googleId: googleUser.uid
         }
         const newUser = await userModel.createUser({ user })
-        const test = await categoryModel.createDummyContent({ user: (newUser as any).email ?? '' })
+        const test = await userModel.createDummyContent({ user: (newUser as any).email ?? '' })
         console.log('🚀 ~ file: authController.js:42 ~ usersController ~ googleLogin ~ test:', test)
 
         // res.send({ message: 'Usuario creado correctamente', newUser })
@@ -99,7 +99,11 @@ export class usersController {
           userData.quota = 0
           console.log(userData)
           const user = await userModel.createUser({ user: userData })
-          const test = await categoryModel.createDummyContent({ user: user.email })
+          let email = ''
+          if (user !== null && user !== undefined && typeof (user as any).email === 'string') {
+            email = (user as any).email
+          }
+          const test = await userModel.createDummyContent({ user: email })
           console.log('🚀 ~ file: authController.js:42 ~ usersController ~ googleLogin ~ test:', test)
           res.send(user)
         })
@@ -116,7 +120,7 @@ export class usersController {
     try {
       const user = await userModel.getUser({ email: req.body.email })
       console.log(user)
-      if (user._id !== undefined && user._id !== null) {
+      if (!('error' in user) && user._id !== undefined && user._id !== null) {
         const data = await userModel.editUser({ email: req.body.email, user: req.body.fields })
         res.send({ message: 'edición correcta', data })
       } else {

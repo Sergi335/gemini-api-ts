@@ -7,6 +7,8 @@ export interface RequestWithUser extends ExpressRequest {
     name: string
     // add other user properties if needed
   }
+  file?: Express.Multer.File
+  body: any
 }
 
 // Extensión global para compatibilidad futura (cuando ts-node-dev lo soporte mejor)
@@ -16,6 +18,7 @@ declare module 'express-serve-static-core' {
       name: string
       // add other user properties if needed
     }
+    file?: Express.Multer.File
   }
 }
 

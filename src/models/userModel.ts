@@ -1,5 +1,10 @@
 import users from './schemas/userSchema'
+import category from './schemas/categorySchema'
+import link from './schemas/linkSchema'
 import mongoose from 'mongoose'
+import { createRequire } from 'node:module'
+const customRequire = createRequire(import.meta.url)
+const dummyData = customRequire('../utils/dummyData.json')
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class userModel {
@@ -55,6 +60,38 @@ export class userModel {
       console.log('Usuario no encontrado')
       return { error: 'Usuario no encontrado' }
       // Maneja el caso de usuario no encontrado de alguna manera apropiada
+    }
+  }
+
+  static async createDummyContent ({ user }: { user: string }): Promise<{ mensaje: string } | { error: string }> {
+    try {
+      // Borrar los documentos existentes en las colecciones
+      await category.deleteMany({ user })
+      await link.deleteMany({ user })
+
+      // Insertar los documentos de la copia de seguridad en las colecciones
+      for (const col of dummyData.columnas) {
+        const { _id, ...rest } = col
+        await category.create({ ...rest, user })
+      }
+      const data = await category.find({ user })
+      for (const enlace of dummyData.links) {
+        const column = data.find(col => col.name === enlace.panel)
+        // console.log(id._id, enlace.name)
+        if (column != null) {
+          const { _id, ...rest } = enlace
+          await link.create({ ...rest, idpanel: column._id.toString(), user })
+          // console.log({ ...rest, idpanel: column._id.toString(), user })
+        }
+      }
+      const mensaje = 'Copia de seguridad restaurada correctamente.'
+
+      console.log('Copia de seguridad restaurada correctamente.')
+      return ({ mensaje })
+    } catch (error) {
+      const mensaje = 'Error al restaurar la copia de seguridad'
+      console.error('Error al restaurar la copia de seguridad:', error)
+      return ({ mensaje })
     }
   }
 }

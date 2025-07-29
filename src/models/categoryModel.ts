@@ -215,4 +215,18 @@ export class categoryModel {
       return { error: 'Error al actualizar los elementos' }
     }
   }
+
+  static async deleteUserData ({ user }: { user: string }): Promise<{ status: string } | { error: string }> {
+    try {
+      // Eliminar todas las categorías del usuario
+      await category.deleteMany({ user })
+      // Eliminar todos los links del usuario
+      await link.deleteMany({ user })
+
+      return { status: 'Datos del usuario eliminados correctamente' }
+    } catch (error) {
+      console.error('Error al eliminar datos del usuario:', error)
+      return { error: 'Error al eliminar los datos del usuario' }
+    }
+  }
 }
