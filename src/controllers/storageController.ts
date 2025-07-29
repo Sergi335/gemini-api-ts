@@ -43,16 +43,16 @@ export class storageController {
 
   // Validar?
   static async uploadImage (req: RequestWithUser, res: Response): Promise<void> {
-    const file = req.file
     const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+      return
+    }
+    const file = req.file
     const linkId = req.body.linkId
     // Si no hay imagen error
     if (req.file === undefined || req.file === null) {
       res.send({ error: 'No hemos recibido imagen' })
-      return
-    }
-    if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
       return
     }
     try {
@@ -341,18 +341,18 @@ export class storageController {
   }
 
   static async uploadProfileImage (req: RequestWithUser, res: Response): Promise<void> {
-    if (req.file === undefined || req.file === null) {
-      res.status(400).send({ error: 'No se proporcionó ningún archivo' })
-      return
-    }
-
-    const file = req.file
     const user = req.user?.name
 
     if (user === undefined || user === null || user === '') {
       res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
       return
     }
+    if (req.file === undefined || req.file === null) {
+      res.status(400).send({ error: 'No se proporcionó ningún archivo' })
+      return
+    }
+
+    const file = req.file
 
     try {
       // Cambiar loop por seleccionar la única que debe haber, el loop puede venir bien al borrar la cuenta de usuario
