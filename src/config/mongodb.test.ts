@@ -3,8 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Mock de mongoose.connect para evitar conexiones reales
 const connectMock = vi.fn()
+const setMock = vi.fn()
 vi.mock('mongoose', () => ({
-  default: { connect: connectMock }
+  default: {
+    connect: connectMock,
+    set: setMock
+  }
 }))
 
 // Guarda el entorno original para restaurarlo después de cada test

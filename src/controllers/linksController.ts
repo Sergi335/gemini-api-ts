@@ -8,7 +8,10 @@ import { RequestWithUser } from '../types/express'
 export class linksController {
   static async getAllLinks (req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const user = req.user?.name ?? 'SergioSR'
+      const user = req.user?.name
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+      }
       const data = await linkModel.getAllLinks({ user })
       return res.status(200).json({ status: 'success', data })
     } catch (error) {
@@ -17,7 +20,10 @@ export class linksController {
   }
 
   static async getLinkById (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name ?? 'SergioSR'
+    const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    }
     console.log(req.params)
     console.log('Entramos en by id')
     try {
@@ -30,7 +36,10 @@ export class linksController {
 
   static async getAllLinksByCategory (req: RequestWithUser, res: Response): Promise<Response> {
     console.log(req.user)
-    const user = req.user?.name ?? 'SergioSR'
+    const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    }
     console.log('Entramos en by desktop')
     console.log(req.query)
     try {
@@ -43,7 +52,10 @@ export class linksController {
   }
 
   static async getLinksCount (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name ?? 'SergioSR'
+    const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    }
     try {
       const category = typeof req.query.category === 'string' ? req.query.category : undefined
       const linksCount = await linkModel.getLinksCount({ user, category })
@@ -54,7 +66,10 @@ export class linksController {
   }
 
   static async createLink (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name ?? 'SergioSR'
+    const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    }
     const [item] = req.body.data // Esto peta si no es iterable
     item.user = user
     const validatedLink = validateLink(item)
@@ -76,7 +91,10 @@ export class linksController {
   }
 
   static async updateLink (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name ?? 'SergioSR'
+    const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    }
     console.log(req.body)
     const item = req.body.fields
     const { idpanelOrigen, destinyIds } = req.body
@@ -104,7 +122,10 @@ export class linksController {
   static async deleteLink (req: RequestWithUser, res: Response): Promise<Response> {
     console.log(req.body.linkId)
     try {
-      const user = req.user?.name ?? 'SergioSR'
+      const user = req.user?.name
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+      }
       const { linkId } = req.body
       const link = await linkModel.deleteLink({ user, linkId })
       if (link !== null && link !== undefined) {
@@ -117,7 +138,10 @@ export class linksController {
   }
 
   static async bulkMoveLinks (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name ?? 'SergioSR'
+    const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    }
     const { source, destiny, panel, links, escritorio } = req.body
     try {
       const link = await linkModel.bulkMoveLinks({ user, source, destiny, panel, links, escritorio })
@@ -140,13 +164,19 @@ export class linksController {
   }
 
   static async findDuplicateLinks (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name ?? 'SergioSR'
+    const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    }
     const data = await linkModel.findDuplicateLinks({ user })
     return res.send(data)
   }
 
   static async setBookMarksOrder (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name ?? 'SergioSR'
+    const user = req.user?.name
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    }
     const { links } = req.body
     console.log('🚀 ~ linksController ~ setBookMarksOrder ~ links:', links)
     try {
