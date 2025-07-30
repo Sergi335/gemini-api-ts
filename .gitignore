@@ -11,3 +11,5 @@ yarn-error.log*
 # Data backup files
 *dataBackup.json
 *DataBackup.json
+src/Hybrid.md
+src/Proposals.md
