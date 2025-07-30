@@ -4,24 +4,7 @@ import { Request, Response, NextFunction } from 'express'
 import { categoryModel } from '../models/categoryModel'
 import { userModel } from '../models/userModel'
 import { storageController } from './storageController'
-
-const getEnvOrThrow = (key: string): string => {
-  const value = process.env[key]
-  if (value === undefined || value === null || value === '') throw new Error(`Missing required environment variable: ${key}`)
-  return value
-}
-
-const getPrivateKeyOrThrow = (): string => {
-  const key = process.env.FBADMIN_PRIVATE_KEY
-  if (key === undefined || key === null || key === '') {
-    throw new Error('Missing required environment variable: FBADMIN_PRIVATE_KEY')
-  }
-  try {
-    return JSON.parse(key)
-  } catch {
-    return key
-  }
-}
+import { getEnvOrThrow, getPrivateKeyOrThrow } from '../config/env'
 
 const serviceAccount: ServiceAccount = {
   type: getEnvOrThrow('FBADMIN_TYPE'),
@@ -40,6 +23,7 @@ const serviceAccount: ServiceAccount = {
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 })
+
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class usersController {
   // Gestiona el inicio de sesión/registro con la cuenta de google
@@ -56,7 +40,7 @@ export class usersController {
         const user = {
           name: nickname,
           realName: googleUser.displayName,
-          email: googleUser.email ?? '', // Ensure email is always a string
+          email: googleUser.email ?? '',
           newUser: true,
           profileImage: googleUser.photoURL,
           quota: 0,
@@ -148,9 +132,20 @@ export class usersController {
       res.send({ error })
     }
   }
+
+  static async deleteUserData (req: Request, res: Response): Promise<void> {
+    try {
+      const { user } = req.body
+      const userDataDeleted = await categoryModel.deleteUserData({ user })
+      const userDeleted = await userModel.deleteUser({ email: user })
+      const filesDeleted = await storageController.deleteAllUserFiles({ user })
+      res.send({ userDataDeleted, userDeleted, filesDeleted })
+    } catch (error) {
+      res.send({ error })
+    }
+  }
 }
-// El usuario ya está autenticado en firebase, esta función:
-// Comprueba el csrfToken y crea una cookie de sesión
+
 export const sessionCookieMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (
@@ -198,36 +193,27 @@ export const sessionCookieMiddleware = async (req: Request, res: Response, next:
   }
 }
 
-// TODO crear un middleware que compruebe si el usuario está autenticado
 export const checkUserSession = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const sessionCookie = req.cookies?.session ?? undefined
-  const logMessage = `Petición ${Date.now()}, url: ${req.baseUrl}, method: ${req.method}, cookies: ${typeof sessionCookie === 'string' ? sessionCookie.length : 0}}`
-  if (sessionCookie === undefined) {
-    res.status(401).send({ error: 'NOT COOKIE!' }) // por que si le mando un 401 da error de cors?
+  const idToken = req.headers.authorization?.split(' ')[1]
+  if (idToken === undefined || idToken === null || idToken === '') {
+    res.status(401).send({ error: 'No se ha proporcionado un token de autenticación' })
     return
   }
-  // Verify the session cookie. In this case an additional check is added to detect
-  // if the user's Firebase session was revoked, user deleted/disabled, etc.
-  getAuth()
-    .verifySessionCookie(sessionCookie, true /** checkRevoked */)
-    .then(decodedClaims => {
-      if (decodedClaims.email === 'sergiadn@hotmail.com') {
-        req.user = { name: 'sergiadn@hotmail.com' }
-        // Estamos logeados con la cuenta de sergiadn@hotmail, pero con el nombre de sergiadn335@gmail.com (SergioSR) y por lo tanto sus datos
-        console.log(`${logMessage} --> Usuario con email ${decodedClaims.email} autenticado correctamente como ${req.user.name}`)
-      } else {
-        req.user = { name: decodedClaims.email ?? '' }
-        console.log(`${logMessage} --> Usuario con email ${decodedClaims.email ?? ''} autenticado correctamente`)
-      }
-      next()
-    })
-    .catch((error) => {
-      // Session cookie is unavailable or invalid. Force user to login.
-      console.log('Error desde el Middeware')
-      console.log('🚀 ~ file: authController.js:168 ~ checkUserSession ~ sessionCookie:', sessionCookie.length)
-      console.log(error)
-      res.status(401).send({ error: 'MIDDLEWARE UNAUTHORIZE REQUEST!' })
-    })
+  try {
+    const decodedToken = await getAuth().verifyIdToken(idToken)
+    const userData = await userModel.getUser({ email: decodedToken.email ?? '' })
+    if (!('error' in userData)) {
+      // req.user = userData as any
+      req.user = {
+        name: (userData as any).name,
+        email: (userData as any).email
+      } as any
+    }
+    next()
+  } catch (error) {
+    console.error('Error verificando token:', error)
+    res.status(401).send({ error: 'Token de autenticación inválido' })
+  }
 }
 
 // TODO email verification --> Comprobar código

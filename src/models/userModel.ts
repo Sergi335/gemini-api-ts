@@ -2,9 +2,10 @@ import users from './schemas/userSchema'
 import category from './schemas/categorySchema'
 import link from './schemas/linkSchema'
 import mongoose from 'mongoose'
-import { createRequire } from 'node:module'
-const customRequire = createRequire(import.meta.url)
-const dummyData = customRequire('../utils/dummyData.json')
+// import { createRequire } from 'node:module'
+// const customRequire = createRequire(import.meta.url)
+// const dummyData = customRequire('../utils/dummyData.json')
+import dummyData from '../utils/dummyData.json'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class userModel {
@@ -70,13 +71,13 @@ export class userModel {
       await link.deleteMany({ user })
 
       // Insertar los documentos de la copia de seguridad en las colecciones
-      for (const col of dummyData.columnas) {
+      for (const col of dummyData.categories) {
         const { _id, ...rest } = col
         await category.create({ ...rest, user })
       }
       const data = await category.find({ user })
       for (const enlace of dummyData.links) {
-        const column = data.find(col => col.name === enlace.panel)
+        const column = data.find(col => col.name === enlace.categoryId)
         // console.log(id._id, enlace.name)
         if (column != null) {
           const { _id, ...rest } = enlace
