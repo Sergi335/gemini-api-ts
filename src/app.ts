@@ -5,9 +5,10 @@ import { dbConnect } from './config/mongodb'
 import { categoriesRouter } from './routes/categories/categories'
 import { linksRouter } from './routes/links/links'
 import { authRouter } from './routes/auth/auth'
+import { storageRouter } from './routes/storage/storage'
 import { checkUserSession } from './middlewares/checkSession'
 import { env } from './config/env'
-import { initializeFirebase } from './config/firebase'
+// import { initializeFirebase } from './config/firebase'
 import { attachCsrfToken } from './middlewares/csrfToken'
 
 const app = express()
@@ -27,12 +28,12 @@ app.use('/categories', checkUserSession, categoriesRouter)
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' })
 })
-// app.use('/storage', storageRouter)
+app.use('/storage', storageRouter)
 // app.get('/search', searchController.searchLinks)
 
 const port = parseInt(env.PORT, 10)
 
-initializeFirebase()
+// export const firebaseApp = initializeFirebase()
 
 void (async () => {
   await dbConnect()

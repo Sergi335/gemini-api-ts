@@ -1,21 +1,22 @@
-import { initializeApp } from 'firebase/app'
-import { deleteObject, getDownloadURL, getMetadata, getStorage, listAll, ref, uploadBytes } from 'firebase/storage'
+import { deleteObject, getDownloadURL, getMetadata, listAll, ref, uploadBytes } from 'firebase/storage'
 import { Response } from 'express'
 import { RequestWithUser } from '../types/express'
 import { linkModel } from '../models/linkModel'
 import { userModel } from '../models/userModel'
+import { firebaseStorage as storage } from '../config/firebase'
 
-const firebaseConfig = {
-  apiKey: process.env.FB_API_KEY,
-  authDomain: process.env.FB_AUTH_DOMAIN,
-  projectId: process.env.FB_PROJECT_ID,
-  storageBucket: process.env.FB_STORAGE_BUCKET,
-  messagingSenderId: process.env.FB_MESSAGING_ID,
-  appId: process.env.FB_APP_ID
-}
+// const firebaseConfig = {
+//   apiKey: process.env.FB_API_KEY,
+//   authDomain: process.env.FB_AUTH_DOMAIN,
+//   projectId: process.env.FB_PROJECT_ID,
+//   storageBucket: process.env.FB_STORAGE_BUCKET,
+//   messagingSenderId: process.env.FB_MESSAGING_ID,
+//   appId: process.env.FB_APP_ID
+// }
 
-const app = initializeApp(firebaseConfig)
-const storage = getStorage(app)
+// const app = initializeApp(firebaseConfig)
+// Ensure firebaseApp is initialized and is of type FirebaseApp
+// const storage = firebaseStorage
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class storageController {
@@ -59,10 +60,14 @@ export class storageController {
       // El lugar donde quieres guardar el archivo
       const imagesRef = ref(storage, `${user}/images/linkImages`)
       const uniqueSuffix = Date.now().toString() + '-' + Math.round(Math.random() * 1E9).toString()
-      const extension = (file.originalname.split('.').pop() ?? 'jpg') as string
+      const extension = typeof file?.originalname === 'string' ? String(file.originalname.split('.').pop() ?? 'jpg') : 'jpg'
 
       // El lugar y el nombre donde se guardará el archivo
       const imageRef = ref(imagesRef, `${uniqueSuffix}.${extension}`)
+      if (file === undefined || file === null) {
+        res.status(400).send({ error: 'No hemos recibido imagen' })
+        return
+      }
       const snapshot = await uploadBytes(imageRef, file.buffer)
       const downloadURL = await getDownloadURL(snapshot.ref)
       try {

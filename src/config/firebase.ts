@@ -1,7 +1,10 @@
 import admin, { ServiceAccount } from 'firebase-admin'
+import { initializeApp } from 'firebase/app'
+import { getStorage } from 'firebase/storage'
 import { getEnvOrThrow, getPrivateKeyOrThrow } from './env'
 
-export const initializeFirebase = (): void => {
+export const initializeFirebase = (): import('firebase/app').FirebaseApp => {
+  // Inicializar Firebase Admin para autenticación
   const serviceAccount: ServiceAccount = {
     type: getEnvOrThrow('FBADMIN_TYPE'),
     project_id: getEnvOrThrow('FBADMIN_PROJECT_ID'),
@@ -19,4 +22,22 @@ export const initializeFirebase = (): void => {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   })
+
+  // Inicializar Firebase Client para storage
+  const firebaseConfig = {
+    apiKey: getEnvOrThrow('FB_API_KEY'),
+    authDomain: getEnvOrThrow('FB_AUTH_DOMAIN'),
+    projectId: getEnvOrThrow('FB_PROJECT_ID'),
+    storageBucket: getEnvOrThrow('FB_STORAGE_BUCKET'),
+    messagingSenderId: getEnvOrThrow('FB_MESSAGING_ID')
+    // appId: getEnvOrThrow('FB_APP_ID')
+  }
+
+  return initializeApp(firebaseConfig)
 }
+
+// Inicializar Firebase una sola vez
+export const firebaseApp = initializeFirebase()
+
+// Exportar storage ya configurado
+export const firebaseStorage = getStorage(firebaseApp)
