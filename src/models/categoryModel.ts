@@ -14,6 +14,11 @@ export class categoryModel {
     return data
   }
 
+  static async getTopLevelCategories ({ user }: { user: string }): Promise<mongoose.Document[]> {
+    const data = await category.find({ user, level: 0 }).sort({ order: 1 })
+    return data
+  }
+
   static async getCategoryByParent ({ user, parentId }: { user: string, parentId: string }): Promise<mongoose.Document[] | CategoryErrorResponse> {
     const data = await category.find({ user, parentId }).sort({ order: 1 })
     if (data.length > 0) {

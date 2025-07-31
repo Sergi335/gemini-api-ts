@@ -19,6 +19,19 @@ export class categoriesController {
     }
   }
 
+  static async getTopLevelCategories (req: RequestWithUser, res: Response): Promise<Response> {
+    try {
+      const user = req.user?.name
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+      }
+      const data = await categoryModel.getTopLevelCategories({ user })
+      return res.status(200).json({ status: 'success', data })
+    } catch (error) {
+      return res.status(500).send({ status: 'fail', error })
+    }
+  }
+
   static async createCategory (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const user = req.user?.name
