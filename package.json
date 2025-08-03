@@ -13,7 +13,11 @@
     "test": "vitest",
     "convert-data": "ts-node src/utils/convertData.ts",
     "import-data": "ts-node src/utils/dataImporter.ts",
-    "import-data-overwrite": "ts-node src/utils/dataImporter.ts --overwrite"
+    "import-data-overwrite": "ts-node src/utils/dataImporter.ts --overwrite",
+        "migrate-parent-category": "ts-node src/utils/migrateParentCategory.ts",
+    "migrate-parent-category-direct": "ts-node src/utils/migrateParentCategoryDirect.ts",
+    "rollback-parent-category": "ts-node src/utils/rollbackParentCategory.ts",
+    "check-migration-status": "ts-node src/utils/checkMigrationStatus.ts"
   },
   "keywords": [],
   "author": "",

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express'
+import { NextFunction, Request, Response } from 'express'
 
 export const attachCsrfToken = (route: string, cookieName: string, csrfToken: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -6,12 +6,12 @@ export const attachCsrfToken = (route: string, cookieName: string, csrfToken: st
     const isLocal = process.env.NODE_ENV !== 'production'
     const options = {
       maxAge: expiresIn,
-      httpOnly: true,
+      httpOnly: false,
       secure: !isLocal, // false en local, true en producción
       sameSite: isLocal ? 'lax' as const : 'none' as const
     }
     res.cookie(cookieName, csrfToken, options)
-    res.send({ csrfToken })
+    res.send({ csrfToken, message: 'Welcome to the Zenmarks API!' })
     next()
   }
 }

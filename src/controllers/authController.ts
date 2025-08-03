@@ -79,8 +79,9 @@ export class authController {
   }
 
   static async handleLogout (req: Request, res: Response): Promise<void> {
-    res.clearCookie('session').send({ status: 'Logged out' })
-    // res.redirect('/login')
+    res.clearCookie('csrfToken')
+    res.clearCookie('session')
+    res.send({ status: 'Logged out' }) // TODO: Comprobar que se borra la cookie de sesión
   }
 }
 

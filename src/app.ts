@@ -1,15 +1,15 @@
-import express from 'express'
 import cookieParser from 'cookie-parser'
-import cors from './middlewares/cors'
+import express from 'express'
+import { env } from './config/env'
 import { dbConnect } from './config/mongodb'
+import { checkUserSession } from './middlewares/checkUserSession'
+import cors from './middlewares/cors'
+import { attachCsrfToken } from './middlewares/csrfToken'
+import { globalErrorHandler } from './middlewares/errorHandler'
+import { authRouter } from './routes/auth/auth'
 import { categoriesRouter } from './routes/categories/categories'
 import { linksRouter } from './routes/links/links'
-import { authRouter } from './routes/auth/auth'
 import { storageRouter } from './routes/storage/storage'
-import { checkUserSession } from './middlewares/checkSession'
-import { env } from './config/env'
-// import { initializeFirebase } from './config/firebase'
-import { attachCsrfToken } from './middlewares/csrfToken'
 
 const app = express()
 export default app
@@ -19,17 +19,18 @@ app.use(express.json())
 app.use(cookieParser())
 
 app.use(cors)
-app.get('/', attachCsrfToken('/', 'csrfToken', (Math.random() * 100000000000000000).toString()), (req, res) => {
-  res.send('Welcome to the Zenmarks API!')
-})
+app.get('/', attachCsrfToken('/', 'csrfToken', (Math.random() * 100000000000000000).toString()))
 app.use('/auth', authRouter)
 app.use('/links', checkUserSession, linksRouter)
 app.use('/categories', checkUserSession, categoriesRouter)
+app.use('/storage', checkUserSession, storageRouter)
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' })
 })
-app.use('/storage', storageRouter)
 // app.get('/search', searchController.searchLinks)
+
+// Global error handler - debe ir al final
+app.use(globalErrorHandler)
 
 const port = parseInt(env.PORT, 10)
 

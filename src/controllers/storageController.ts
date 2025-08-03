@@ -1,9 +1,9 @@
-import { deleteObject, getDownloadURL, getMetadata, listAll, ref, uploadBytes } from 'firebase/storage'
 import { Response } from 'express'
-import { RequestWithUser } from '../types/express'
+import { deleteObject, getDownloadURL, getMetadata, listAll, ref, uploadBytes } from 'firebase/storage'
+import { firebaseStorage as storage } from '../config/firebase'
 import { linkModel } from '../models/linkModel'
 import { userModel } from '../models/userModel'
-import { firebaseStorage as storage } from '../config/firebase'
+import { RequestWithUser } from '../types/express'
 
 // const firebaseConfig = {
 //   apiKey: process.env.FB_API_KEY,
@@ -26,9 +26,9 @@ export class storageController {
       const fileRef = ref(storage, 'miniatures')
       const list = await listAll(fileRef)
       const { items } = list
-      items.forEach((item) => {
-        getMetadata(item).then(metadata => console.log(metadata)).catch(console.error)
-      })
+      // items.forEach((item) => {
+      //   getMetadata(item).then(metadata => console.log(metadata)).catch(console.error)
+      // })
       const backgroundsPromises = items.map(async (back) => ({
         url: await getDownloadURL(back),
         nombre: (await getMetadata(back)).name
@@ -162,7 +162,7 @@ export class storageController {
     try {
       const imagesRef = ref(storage, `${user}/images/icons`)
       const uniqueSuffix = Date.now().toString() + '-' + Math.round(Math.random() * 1E9).toString()
-      const extension = (file.originalname.split('.').pop() ?? 'jpg') as string
+      const extension = (file.originalname.split('.').pop() ?? 'jpg')
       const imageRef = ref(imagesRef, `${uniqueSuffix}.${extension}`)
       const snapshot = await uploadBytes(imageRef, file.buffer)
       const downloadURL = await getDownloadURL(snapshot.ref)
@@ -375,7 +375,7 @@ export class storageController {
         await deleteObject(items[0])
       }
       const uniqueSuffix = Date.now().toString() + '-' + Math.round(Math.random() * 1E9).toString()
-      const extension = (file.originalname.split('.').pop() ?? 'jpg') as string
+      const extension = (file.originalname.split('.').pop() ?? 'jpg')
       const imageRef = ref(imagesRef, `${uniqueSuffix}.${extension}`)
       const snapshot = await uploadBytes(imageRef, file.buffer)
       const newSize = snapshot.metadata.size

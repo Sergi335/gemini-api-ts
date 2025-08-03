@@ -1,14 +1,45 @@
 import Express from 'express'
 import { authController } from '../../controllers/authController'
 import { userController } from '../../controllers/userController'
-import { sessionCookieMiddleware } from '../../middlewares/sessionCookie'
-import { checkUserSession } from '../../middlewares/checkSession'
+import { checkUserSession } from '../../middlewares/checkUserSession'
+import { setSessionCookie } from '../../middlewares/setSessionCookie'
+import {
+  loginBodySchema,
+  registerBodySchema,
+  updateUserBodySchema
+} from '../../middlewares/validation/validationSchemas'
+import { validateBody } from '../../middlewares/validation/zodValidator'
 
 export const authRouter = Express.Router()
-// técnicamente no hacemos el login habría que cambiar la ruta a /session por ejemplo
-authRouter.post('/login', sessionCookieMiddleware, authController.getLoggedUserInfo)
-authRouter.post('/googlelogin', sessionCookieMiddleware, authController.googleLogin)
-authRouter.post('/register', sessionCookieMiddleware, authController.setLoggedUserInfo)
-authRouter.post('/logout', sessionCookieMiddleware, authController.handleLogout)
-authRouter.patch('/updateuser', checkUserSession, userController.editUserInfo)
-authRouter.delete('/deleteuser', checkUserSession, userController.deleteUserInfo) // lo borra antes de que pase el middleware y no lo encuentra
+
+// Rutas públicas con validación de body
+authRouter.post('/login',
+  validateBody(loginBodySchema),
+  setSessionCookie,
+  authController.getLoggedUserInfo
+)
+authRouter.post('/googlelogin',
+  validateBody(loginBodySchema),
+  setSessionCookie,
+  authController.googleLogin
+)
+authRouter.post('/register',
+  validateBody(registerBodySchema),
+  setSessionCookie,
+  authController.setLoggedUserInfo
+)
+authRouter.post('/logout',
+  setSessionCookie,
+  authController.handleLogout
+)
+
+// Rutas protegidas con validación de sesión y body
+authRouter.patch('/updateuser',
+  checkUserSession,
+  validateBody(updateUserBodySchema),
+  userController.editUserInfo
+)
+authRouter.delete('/deleteuser',
+  checkUserSession,
+  userController.deleteUserInfo
+)

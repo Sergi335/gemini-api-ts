@@ -1,16 +1,40 @@
 import Express from 'express'
 import { categoriesController } from '../../controllers/categoriesController'
+import {
+  createCategoryBodySchema,
+  deleteCategoryBodySchema,
+  updateCategoryBodySchema
+} from '../../middlewares/validation/validationSchemas'
+import { validateBody } from '../../middlewares/validation/zodValidator'
 
 const categoriesRouter = Express.Router()
 
-// Ahora podemos usar directamente los métodos del controlador
+// Rutas GET - no necesitan validación adicional (checkUserSession ya se aplica en app.ts)
 categoriesRouter.get('/', categoriesController.getAllCategories)
 categoriesRouter.get('/toplevel', categoriesController.getTopLevelCategories)
-// categoriesRouter.get('/getbydesk/:desktop', categoriesController.getColumnByDesktop)
-// categoriesRouter.get('/count', categoriesController.getColumnCount)
 
-categoriesRouter.post('/', categoriesController.createCategory)
-categoriesRouter.patch('/', categoriesController.updateCategory)
-categoriesRouter.delete('/', categoriesController.deleteCategory)
+// Rutas POST/PATCH/DELETE - solo necesitan validación de body
+categoriesRouter.post('/',
+  validateBody(createCategoryBodySchema),
+  categoriesController.createCategory
+)
+categoriesRouter.post('/nest',
+  // validateBody(nestingCategoriesBodySchema),
+  categoriesController.updateNestingCategories
+)
+categoriesRouter.post('/reorder',
+  // validateBody(nestingCategoriesBodySchema),
+  categoriesController.updateReorderingCategories
+)
+
+categoriesRouter.patch('/',
+  validateBody(updateCategoryBodySchema),
+  categoriesController.updateCategory
+)
+
+categoriesRouter.delete('/',
+  validateBody(deleteCategoryBodySchema),
+  categoriesController.deleteCategory
+)
 
 export { categoriesRouter }

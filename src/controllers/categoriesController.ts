@@ -1,6 +1,5 @@
-import { categoryModel } from '../models/categoryModel'
 import { Response } from 'express'
-import { validateCreateCategory, validateUpdateCategory } from '../validation/categoriesZodSchema'
+import { categoryModel } from '../models/categoryModel'
 import { RequestWithUser } from '../types/express'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
@@ -8,10 +7,8 @@ import { RequestWithUser } from '../types/express'
 export class categoriesController {
   static async getAllCategories (req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const user = req.user?.name
-      if (user === undefined || user === null || user === '') {
-        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      }
+      // Usuario ya validado por middleware validateUser
+      const user = req.user?.name as string
       const data = await categoryModel.getAllCategories({ user })
       return res.status(200).json({ status: 'success', data })
     } catch (error) {
@@ -21,10 +18,8 @@ export class categoriesController {
 
   static async getTopLevelCategories (req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const user = req.user?.name
-      if (user === undefined || user === null || user === '') {
-        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      }
+      // Usuario ya validado por middleware validateUser
+      const user = req.user?.name as string
       const data = await categoryModel.getTopLevelCategories({ user })
       return res.status(200).json({ status: 'success', data })
     } catch (error) {
@@ -32,22 +27,43 @@ export class categoriesController {
     }
   }
 
+  static async updateNestingCategories (req: RequestWithUser, res: Response): Promise<Response> {
+    try {
+      // Usuario ya validado por middleware validateUser
+      const user = req.user?.name as string
+      // Body ya validado por middleware validateBody
+      console.log('req.body', req.body)
+      const receivedData = req.body
+
+      // const data = await categoryModel.updateNestingCategories({ user, categories })
+      return res.status(200).json({ status: 'success', receivedData, user })
+    } catch (error) {
+      return res.status(500).send({ status: 'fail', error })
+    }
+  }
+
+  static async updateReorderingCategories (req: RequestWithUser, res: Response): Promise<Response> {
+    try {
+      // Usuario ya validado por middleware validateUser
+      const user = req.user?.name as string
+      // Body ya validado por middleware validateBody
+      console.log('req.body', req.body)
+      const receivedData = req.body
+
+      // const data = await categoryModel.updateNestingCategories({ user, categories })
+      return res.status(200).json({ status: 'success', receivedData, user })
+    } catch (error) {
+      return res.status(500).send({ status: 'fail', error })
+    }
+  }
+
   static async createCategory (req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const user = req.user?.name
-      if (user === undefined || user === null || user === '') {
-        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      }
+      // Usuario ya validado por middleware validateUser
+      const user = req.user?.name as string
+      // Body ya validado por middleware validateBody
       req.body.user = user
-      const validatedCol = validateCreateCategory(req.body)
-      // Crear mensaje de error
-      if (!validatedCol.success) {
-        const errorsMessageArray = validatedCol.error?.issues.map((error: any) => {
-          return error.message
-        })
-        return res.status(400).json({ status: 'fail', message: errorsMessageArray })
-      }
-      const cleanData = validatedCol.data
+      const cleanData = req.body
       const category = await categoryModel.createCategory({ user, cleanData })
       return res.status(201).json({ status: 'success', category })
     } catch (error) {
@@ -57,28 +73,14 @@ export class categoriesController {
 
   static async updateCategory (req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      // El id no se valida, los columnsids tampoco
-      const user = req.user?.name
-      if (user === undefined || user === null || user === '') {
-        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      }
-      const { fields, id } = req.body
-      let elements
-      if (typeof req.body.columnsIds !== 'undefined' && req.body.columnsIds !== null) {
-        elements = req.body.columnsIds
-      }
-      const validatedCol = validateUpdateCategory(fields)
+      // Usuario ya validado por middleware validateUser
+      const user = req.user?.name as string
+      // Body ya validado por middleware validateBody
+      const { fields, id, columnsIds } = req.body
+      const elements = columnsIds // Mantener compatibilidad con el modelo
 
-      // Crear mensaje de error
-      if (!validatedCol.success) {
-        const errorsMessageArray = validatedCol.error?.issues.map((error: any) => {
-          return error.message
-        })
-        return res.status(400).json({ status: 'fail', message: errorsMessageArray })
-      }
-      const cleanData = validatedCol.data
-      const column = await categoryModel.updateCategory({ user, id, cleanData, elements })
-      return res.status(201).json({ status: 'success', column }) // No siempre es success esto solo peta con errores gordos
+      const column = await categoryModel.updateCategory({ user, id, cleanData: fields, elements })
+      return res.status(200).json({ status: 'success', column })
     } catch (error) {
       return res.status(500).send({ status: 'fail', error })
     }
@@ -86,11 +88,10 @@ export class categoriesController {
 
   static async deleteCategory (req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const user = req.user?.name
-      if (user === undefined || user === null || user === '') {
-        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      }
-      const id = req.body.id
+      // Usuario ya validado por middleware validateUser
+      const user = req.user?.name as string
+      // Body ya validado por middleware validateBody
+      const { id } = req.body
       const column = await categoryModel.deleteCategory({ id, user })
       return res.status(200).json({ status: 'success', column })
     } catch (error) {

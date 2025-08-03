@@ -1,11 +1,22 @@
-import { Request, Response, NextFunction } from 'express'
+import { NextFunction, Request, Response } from 'express'
 import { getAuth } from 'firebase-admin/auth'
 
 export const checkUserSession = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const sessionCookie = req.cookies?.session ?? undefined
+  // console.log(req.headers['x-csrf-token'])
+
   const logMessage = `Petición ${Date.now()}, url: ${req.baseUrl}, method: ${req.method}, cookies: ${String(sessionCookie?.length)}}`
   if (sessionCookie === undefined) {
     res.status(401).send({ error: 'NOT COOKIE!' }) // por que si le mando un 401 da error de cors?
+    return
+  }
+  const csrfToken = req.headers['x-csrf-token'] as string | undefined
+  console.log('Token del header:', csrfToken)
+  console.log('Token de la cookie:', req.cookies.csrfToken)
+  // console.log(req.cookies)
+  // console.log(req.headers)
+  if (csrfToken !== req.cookies.csrfToken) {
+    res.status(401).send({ message: 'NO COINCIDE UNAUTHORIZED REQUEST!' })
     return
   }
   // Verify the session cookie. In this case an additional check is added to detect

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { getAuth } from 'firebase-admin/auth'
 
-export const sessionCookieMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const setSessionCookie = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (
       typeof req.body.idToken !== 'string' ||
@@ -18,7 +18,7 @@ export const sessionCookieMiddleware = async (req: Request, res: Response, next:
     console.log('🚀 ~ sessionCookieMiddleware ~ idToken:', req.cookies.csrfToken)
     // Guard against CSRF attacks.
     if (csrfToken !== req.cookies.csrfToken) {
-      res.status(401).send({ message: 'NO COINCIDE UNAUTHORIZED REQUEST!' })
+      res.status(401).send({ message: 'NO COINCIDE UNAUTHORIZED REQUEST! setSessionCookie' })
       return
     }
     // Set session expiration to 5 days.
