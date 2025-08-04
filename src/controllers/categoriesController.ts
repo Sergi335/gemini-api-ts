@@ -32,11 +32,24 @@ export class categoriesController {
       // Usuario ya validado por middleware validateUser
       const user = req.user?.name as string
       // Body ya validado por middleware validateBody
-      console.log('req.body', req.body)
-      const receivedData = req.body
+      const { updates } = req.body
 
-      // const data = await categoryModel.updateNestingCategories({ user, categories })
-      return res.status(200).json({ status: 'success', receivedData, user })
+      const result = await categoryModel.updateNestingCategories({ user, categories: updates })
+
+      if (result.success) {
+        return res.status(200).json({
+          status: 'success',
+          message: `${result.updatedCount} categorías actualizadas exitosamente`,
+          updatedCount: result.updatedCount
+        })
+      } else {
+        return res.status(400).json({
+          status: 'partial_success',
+          message: `${result.updatedCount} de ${String(updates.length)} categorías actualizadas`,
+          updatedCount: result.updatedCount,
+          errors: result.errors
+        })
+      }
     } catch (error) {
       return res.status(500).send({ status: 'fail', error })
     }
@@ -46,12 +59,26 @@ export class categoriesController {
     try {
       // Usuario ya validado por middleware validateUser
       const user = req.user?.name as string
+      console.log('🚀 ~ categoriesController ~ updateReorderingCategories ~ user:', user)
       // Body ya validado por middleware validateBody
-      console.log('req.body', req.body)
-      const receivedData = req.body
+      const { updates } = req.body
 
-      // const data = await categoryModel.updateNestingCategories({ user, categories })
-      return res.status(200).json({ status: 'success', receivedData, user })
+      const result = await categoryModel.updateReorderingCategories({ user, categories: updates })
+
+      if (result.success) {
+        return res.status(200).json({
+          status: 'success',
+          message: `${result.updatedCount} categorías reordenadas exitosamente`,
+          updatedCount: result.updatedCount
+        })
+      } else {
+        return res.status(400).json({
+          status: 'partial_success',
+          message: `${result.updatedCount} de ${String(updates.length)} categorías reordenadas`,
+          updatedCount: result.updatedCount,
+          errors: result.errors
+        })
+      }
     } catch (error) {
       return res.status(500).send({ status: 'fail', error })
     }

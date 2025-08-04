@@ -1,6 +1,10 @@
 import { Schema, model } from 'mongoose'
 
 const CategorySchema = new Schema({
+  _id: {
+    type: String,
+    required: true
+  },
   name: {
     type: String
   },
@@ -19,6 +23,9 @@ const CategorySchema = new Schema({
   slug: {
     type: String,
     unique: true
+  },
+  parentSlug: {
+    type: String
   },
   hidden: {
     type: Boolean,

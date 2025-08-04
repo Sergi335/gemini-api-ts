@@ -1,11 +1,11 @@
 import mongoose from 'mongoose'
-import category from './schemas/categorySchema'
-import link from './schemas/linkSchema'
 import type {
   CategoryCleanData,
-  MoveCategoryResponse,
-  CategoryErrorResponse
+  CategoryErrorResponse,
+  MoveCategoryResponse
 } from '../types/categoryModel.types'
+import category from './schemas/categorySchema'
+import link from './schemas/linkSchema'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class categoryModel {
@@ -218,6 +218,187 @@ export class categoryModel {
     } catch (error) {
       console.error(error)
       return { error: 'Error al actualizar los elementos' }
+    }
+  }
+
+  static async updateNestingCategories ({
+    user,
+    categories
+  }: {
+    user: string
+    categories: Array<{
+      itemId: string
+      newOrder: number
+      newLevel: number
+      parentId: string | null
+    }>
+  }): Promise<{ success: boolean, updatedCount: number, errors: string[] }> {
+    const session = await mongoose.startSession()
+    const errors: string[] = []
+    let updatedCount = 0
+
+    try {
+      session.startTransaction()
+
+      // Procesar cada categoría en el array
+      for (const categoryUpdate of categories) {
+        try {
+          const { itemId, newOrder, newLevel, parentId } = categoryUpdate
+
+          // Verificar que la categoría existe y pertenece al usuario
+          const existingCategory = await category.findOne({
+            _id: itemId,
+            user
+          }).session(session)
+
+          if (existingCategory === null) {
+            errors.push(`Categoría con ID ${itemId} no encontrada`)
+            continue
+          }
+
+          // Preparar los datos de actualización
+          const updateData: any = {
+            order: newOrder,
+            level: newLevel
+          }
+
+          // Solo actualizar parentId si se proporciona (puede ser null para categorías raíz)
+          if (parentId !== undefined) {
+            updateData.parentId = parentId
+          }
+
+          // Actualizar la categoría
+          const updatedCategory = await category.findOneAndUpdate(
+            { _id: itemId, user },
+            { $set: updateData },
+            { new: true, session }
+          )
+
+          if (updatedCategory !== null) {
+            updatedCount++
+
+            // Si se cambió el parentId, también actualizar los links asociados
+            if (parentId !== undefined && existingCategory.parentId !== parentId) {
+              await link.updateMany(
+                { idpanel: itemId, user },
+                { $set: { parentId } },
+                { session }
+              )
+            }
+          } else {
+            errors.push(`No se pudo actualizar la categoría ${itemId}`)
+          }
+        } catch (error) {
+          errors.push(`Error actualizando categoría ${categoryUpdate.itemId}: ${(error as Error).message}`)
+        }
+      }
+
+      // Confirmar la transacción solo si no hay errores críticos
+      if (errors.length === 0 || updatedCount > 0) {
+        await session.commitTransaction()
+      } else {
+        await session.abortTransaction()
+      }
+
+      await session.endSession()
+
+      return {
+        success: errors.length === 0,
+        updatedCount,
+        errors
+      }
+    } catch (error) {
+      await session.abortTransaction()
+      await session.endSession()
+
+      return {
+        success: false,
+        updatedCount: 0,
+        errors: [`Error general en la transacción: ${(error as Error).message}`]
+      }
+    }
+  }
+
+  static async updateReorderingCategories ({
+    user,
+    categories
+  }: {
+    user: string
+    categories: Array<{
+      itemId: string
+      newOrder: number
+      newLevel: number
+      parentId: string | null
+      parentSlug: string | null
+    }>
+  }): Promise<{ success: boolean, updatedCount: number, errors: string[] }> {
+    const errors: string[] = []
+    let updatedCount = 0
+    // console.log('🚀 ~ categoryModel ~ updateReorderingCategories ~ user:', parentSlug)
+
+    try {
+      // Procesar cada categoría
+      for (const categoryUpdate of categories) {
+        const { itemId, newOrder, newLevel, parentId, parentSlug } = categoryUpdate
+        console.log('🚀 ~ categoryModel ~ updateReorderingCategories ~ itemId:', parentSlug)
+        const findDocument = await category.findById((new mongoose.Types.ObjectId(itemId)))
+        console.log('🚀 ~ categoryModel ~ updateReorderingCategories ~ findDocument:', findDocument)
+
+        // Actualizar solo order y level (sin parentId para reordering)
+        const result = await category.findOneAndUpdate(
+          { _id: itemId, user },
+          { $set: { order: newOrder, level: newLevel, parentId, parentSlug } },
+          { new: true }
+        )
+        console.log('🚀 ~ categoryModel ~ updateReorderingCategories ~ result:', result)
+
+        if (result !== null) {
+          updatedCount++
+        } else {
+          errors.push(`No se encontró categoría ${itemId}`)
+        }
+      }
+
+      return {
+        success: errors.length === 0,
+        updatedCount,
+        errors
+      }
+    } catch (error) {
+      return {
+        success: false,
+        updatedCount: 0,
+        errors: [`Error: ${(error as Error).message}`]
+      }
+    }
+  }
+
+  // ===== FUNCIÓN SIMPLE DE DEBUG =====
+  static async testSimpleQuery (id: string): Promise<void> {
+    console.log(`=== TEST SIMPLE CON ID: ${id} ===`)
+
+    try {
+      // Test 1: findById directo
+      const test1 = await category.findById(id)
+      console.log('Test 1 - findById():', test1 !== null ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO')
+
+      // Test 2: findOne con _id
+      const test2 = await category.findOne({ _id: id })
+      console.log('Test 2 - findOne({_id}):', test2 !== null ? '✅ ENCONTRADO' : '❌ NO ENCONTRADO')
+
+      // Test 3: Verificar si es ObjectId válido
+      console.log('Test 3 - Es ObjectId válido?', mongoose.Types.ObjectId.isValid(id))
+
+      // Test 4: Count documents con este ID
+      const count = await category.countDocuments({ _id: id })
+      console.log('Test 4 - Count con este ID:', count)
+
+      if (test1 !== null) {
+        console.log('✅ Documento encontrado - Usuario:', test1.user)
+        console.log('✅ Documento encontrado - Nombre:', test1.name)
+      }
+    } catch (error) {
+      console.log('❌ Error en test:', (error as Error).message)
     }
   }
 

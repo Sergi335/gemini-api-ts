@@ -17,7 +17,10 @@
         "migrate-parent-category": "ts-node src/utils/migrateParentCategory.ts",
     "migrate-parent-category-direct": "ts-node src/utils/migrateParentCategoryDirect.ts",
     "rollback-parent-category": "ts-node src/utils/rollbackParentCategory.ts",
-    "check-migration-status": "ts-node src/utils/checkMigrationStatus.ts"
+    "check-migration-status": "ts-node src/utils/checkMigrationStatus.ts",
+    "migrate-parent-slug": "ts-node src/utils/migrateParentSlug.ts",
+    "migrate-parent-slug:check": "ts-node src/utils/checkParentSlugStatus.ts",
+    "migrate-parent-slug:rollback": "ts-node src/utils/rollbackParentSlug.ts"
   },
   "keywords": [],
   "author": "",
