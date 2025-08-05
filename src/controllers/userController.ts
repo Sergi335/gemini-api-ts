@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
+import { categoryModel } from '../models/categoryModel'
 import { userModel } from '../models/userModel'
 import { storageController } from './storageController'
-import { categoryModel } from '../models/categoryModel'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class userController {
@@ -26,7 +26,7 @@ export class userController {
   static async deleteUserInfo (req: Request, res: Response): Promise<void> {
     try {
       const { email } = req.body
-      const data = await categoryModel.deleteUserData({ user: email })
+      const data = await categoryModel.deleteUserData({ userId: email })
       await storageController.deleteAllUserFiles({ user: email })
       res.send({ status: 'success', data })
     } catch (error) {
@@ -39,7 +39,7 @@ export class userController {
   static async deleteUserData (req: Request, res: Response): Promise<void> {
     try {
       const { user } = req.body
-      const userDataDeleted = await categoryModel.deleteUserData({ user })
+      const userDataDeleted = await categoryModel.deleteUserData({ userId: user })
       const userDeleted = await userModel.deleteUser({ email: user })
       const filesDeleted = await storageController.deleteAllUserFiles({ user })
       res.send({ userDataDeleted, userDeleted, filesDeleted })

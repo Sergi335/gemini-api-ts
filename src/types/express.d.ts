@@ -4,7 +4,9 @@ import { Request as ExpressRequest } from 'express'
 // Interfaz extendida que se puede importar
 export interface RequestWithUser extends ExpressRequest {
   user?: {
+    _id?: string // optional id field
     name: string
+    email?: string // optional email field
     // add other user properties if needed
   }
   file?: Express.Multer.File
@@ -16,6 +18,8 @@ declare module 'express-serve-static-core' {
   interface Request {
     user?: {
       name: string
+      email?: string // optional email field
+      _id?: string // optional id field
       // add other user properties if needed
     }
     file?: Express.Multer.File
@@ -26,6 +30,8 @@ declare module 'express-serve-static-core' {
 export interface AuthenticatedRequest extends ExpressRequest {
   user: {
     name: string
+    email?: string // optional email field
+    _id?: string // optional id field
     // add other user properties if needed
   }
 }

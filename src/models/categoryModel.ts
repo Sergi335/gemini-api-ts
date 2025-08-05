@@ -9,18 +9,30 @@ import link from './schemas/linkSchema'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class categoryModel {
-  static async getAllCategories ({ user }: { user: string }): Promise<mongoose.Document[]> {
-    const data = await category.find({ user }).sort({ order: 1 })
+  static async getAllCategories ({ userId }: { userId: string }): Promise<mongoose.Document[] | CategoryErrorResponse> {
+    console.log('🚀 ~ categoryModel ~ getAllCategories ~ userId:', userId)
+    console.log('🚀 ~ categoryModel ~ getAllCategories ~ userId as ObjectId:', new mongoose.Types.ObjectId(userId))
+
+    // Usar el ObjectId en la consulta
+    const objectIdUser = new mongoose.Types.ObjectId(userId)
+    const data = await category.find({ user: objectIdUser }).sort({ order: 1 })
+
+    if (data.length > 0) {
+      return data
+    } else {
+      return { error: 'No se encontraron categorías' }
+    }
+  }
+
+  static async getTopLevelCategories ({ userId }: { userId: string }): Promise<mongoose.Document[]> {
+    const objectIdUser = new mongoose.Types.ObjectId(userId)
+    const data = await category.find({ user: objectIdUser, level: 0 }).sort({ order: 1 })
     return data
   }
 
-  static async getTopLevelCategories ({ user }: { user: string }): Promise<mongoose.Document[]> {
-    const data = await category.find({ user, level: 0 }).sort({ order: 1 })
-    return data
-  }
-
-  static async getCategoryByParent ({ user, parentId }: { user: string, parentId: string }): Promise<mongoose.Document[] | CategoryErrorResponse> {
-    const data = await category.find({ user, parentId }).sort({ order: 1 })
+  static async getCategoriesByParentSlug ({ userId, parentSlug }: { userId: string, parentSlug: string }): Promise<mongoose.Document[] | CategoryErrorResponse> {
+    const objectIdUser = new mongoose.Types.ObjectId(userId)
+    const data = await category.find({ user: objectIdUser, parentSlug }).sort({ order: 1 })
     if (data.length > 0) {
       return data
     } else {
@@ -28,8 +40,9 @@ export class categoryModel {
     }
   }
 
-  static async getCategoryCount ({ user }: { user: string }): Promise<number | CategoryErrorResponse> {
-    const data = await category.find({ user }).countDocuments()
+  static async getCategoryCount ({ userId }: { userId: string }): Promise<number | CategoryErrorResponse> {
+    const objectIdUser = new mongoose.Types.ObjectId(userId)
+    const data = await category.find({ user: objectIdUser }).countDocuments()
     if (data > 0) {
       return data
     } else {
@@ -38,43 +51,45 @@ export class categoryModel {
   }
 
   static async createCategory (
-    { user, cleanData }: { user: string, cleanData: CategoryCleanData }
+    { userId, cleanData }: { userId: string, cleanData: CategoryCleanData }
   ): Promise<mongoose.Document[]> {
     if (cleanData.name == null || cleanData.name.trim() === '') {
       throw new Error('Category name is required to generate a slug')
     }
-    const slug = await this.generateUniqueSlug({ user, name: cleanData.name })
-    const data = await category.create({ user, ...cleanData, slug })
+    const objectIdUser = new mongoose.Types.ObjectId(userId)
+    const slug = await this.generateUniqueSlug({ userId, name: cleanData.name })
+    const data = await category.create({ user: objectIdUser, ...cleanData, slug })
     return [data]
   }
 
-  static async updateCategory ({ user, id, cleanData, elements }: { user: string, id: string, cleanData: CategoryCleanData, elements?: string[] }): Promise<mongoose.Document | CategoryErrorResponse> {
+  static async updateCategory ({ userId, id, cleanData, elements }: { userId: string, id: string, cleanData: CategoryCleanData, elements?: string[] }): Promise<mongoose.Document | CategoryErrorResponse> {
     console.log(id, cleanData)
+    const userObjectId = new mongoose.Types.ObjectId(userId)
     // if name - if escritorio -> if order
     // Si el campo elementos está presente es una ordenación
     if (elements !== undefined) {
-      const res = await this.setColumnsOrder({ user, elementos: elements, parentId: cleanData.parentId })
+      const res = await this.setColumnsOrder({ userId, elementos: elements, parentId: new mongoose.Types.ObjectId(cleanData.parentId) })
       // Es una ordenación terminamos aqui
       return res
     }
     // Si se ha movido a otro escritorio el campo escritorio está presente
     // tomamos el campo orden midiendo la longitud del array de columnas del escritorio destino
     if (cleanData.parentId !== undefined) {
-      const destinationCategories = await category.find({ parentId: cleanData.parentId, user })
+      const destinationCategories = await category.find({ parentId: cleanData.parentId, user: userObjectId })
       cleanData.order = destinationCategories.length
     }
     // Si se ha cambiado el nombre de la columna actualizamos el slug
     if (cleanData.name !== undefined) {
-      const slug = await this.generateUniqueSlug({ user, name: cleanData.name })
+      const slug = await this.generateUniqueSlug({ userId, name: cleanData.name })
       cleanData.slug = slug
     }
-    const session = await mongoose.startSession()
+
     try {
-      session.startTransaction()
-      // Actualizamos la columna
-      const data = await category.findOneAndUpdate({ _id: id, user }, { $set: { ...cleanData } }, { new: true }).session(session)
+      // Actualizamos la columna sin transacciones para test environment
+      const data = await category.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: { ...cleanData } }, { new: true })
+
       // Actualizamos los Links
-      const filtro = { idpanel: id, user } // Filtrar documentos
+      const filtro = { idpanel: id, user: userObjectId } // Filtrar documentos
       // Si se ha cambiado el nombre de la columna actualizamos el nombre del panel
       // Si se ha cambiado el escritorio actualizamos el escritorio de los links
       // No se pueden cambiar los dos a la vez
@@ -82,55 +97,48 @@ export class categoryModel {
         ? { $set: { panel: cleanData.name } }
         : { $set: { parentId: cleanData.parentId } } // Actualizar
 
-      await link.updateMany(filtro, actualizacion).session(session) // esto puede fallar si no hay links?
-      await session.commitTransaction()
-      await session.endSession()
+      await link.updateMany(filtro, actualizacion)
+
       if (data !== null) {
         return data
       } else {
         return { error: 'La columna no existe' }
       }
     } catch (error) {
-      await session.abortTransaction()
-      await session.endSession()
       return ({ error: (error as Error).message })
     }
   }
 
-  static async deleteCategory ({ user, id }: { user: string, id: string }): Promise<mongoose.Document | CategoryErrorResponse> {
-    const session = await mongoose.startSession()
-
+  static async deleteCategory ({ userId, id }: { userId: string, id: string }): Promise<mongoose.Document | CategoryErrorResponse> {
+    const userObjectId = new mongoose.Types.ObjectId(userId)
     try {
-      session.startTransaction()
       // Buscamos la columna que nos pasan por el body
-      const column = await category.findOne({ _id: id, user }).session(session)
+      const column = await category.findOne({ _id: id, user: userObjectId })
+      if (column === null) {
+        return { error: 'La columna no existe' }
+      }
+
       // Borramos los links asociados a la columna
-      await link.deleteMany({ idpanel: id, user }).session(session)
+      await link.deleteMany({ idpanel: id, user: userObjectId })
       // Borramos la columna
-      await category.deleteOne({ _id: id, user }).session(session)
-      await session.commitTransaction()
-      await session.endSession()
+      await category.deleteOne({ _id: id, user: userObjectId })
 
       // find by user y escritorio y pasar a ordenar
-      const columnsLeft = await category.find({ parentId: column?.parentId, user }).sort({ order: 1 })
+      const columnsLeft = await category.find({ parentId: column?.parentId, user: userObjectId }).sort({ order: 1 })
       const columsLeftIds = columnsLeft.map(col => (
         col._id.toString()
       ))
-      await this.setColumnsOrder({ user, elementos: columsLeftIds, parentId: column?.parentId })
-      if (column !== null) {
-        return column
-      } else {
-        return { error: 'La columna no existe' }
-      }
+      await this.setColumnsOrder({ userId, elementos: columsLeftIds, parentId: column?.parentId })
+
+      return column
     } catch (error) {
-      await session.abortTransaction()
-      await session.endSession()
       return ({ error: (error as Error).message })
     }
   }
 
-  static async moveCategory ({ user, id, deskDestino, order }: { user: string, id: string, deskDestino: string, order?: number }): Promise<MoveCategoryResponse> {
-    const data = await category.find({ parentId: deskDestino, user })
+  static async moveCategory ({ userId, id, deskDestino, order }: { userId: string, id: string, deskDestino: string, order?: number }): Promise<MoveCategoryResponse> {
+    const userObjectId = new mongoose.Types.ObjectId(userId)
+    const data = await category.find({ parentId: deskDestino, user: userObjectId })
 
     await category.findOneAndUpdate(
       { _id: id }, // El filtro para buscar el documento
@@ -138,7 +146,7 @@ export class categoryModel {
       { new: true } // Opciones adicionales (en este caso, devuelve el documento actualizado)
     )
     // Actualizamos los Links
-    const filtroL = { user, idpanel: id } // Filtrar documentos
+    const filtroL = { user: userObjectId, idpanel: id } // Filtrar documentos
     const actualizacionL = { $set: { escritorio: deskDestino } } // Actualizar
 
     await link.updateMany(filtroL, actualizacionL)
@@ -151,19 +159,20 @@ export class categoryModel {
     }
   }
 
-  static async generateUniqueSlug ({ user, name }: { user: string, name: string }): Promise<string> {
+  static async generateUniqueSlug ({ userId, name }: { userId: string, name: string }): Promise<string> {
+    const userObjectId = new mongoose.Types.ObjectId(userId)
     let slug = this.slugify(name)
     const baseSlug = slug
     let counter = 0
 
     // Busca si el slug ya existe
-    let exists = await category.findOne({ user, slug })
+    let exists = await category.findOne({ user: userObjectId, slug })
 
     // Mientras exista, genera un nuevo slug incrementando el contador
     while (exists !== null) {
       counter++
       slug = `${String(baseSlug)}_${String(counter)}`
-      exists = await category.findOne({ user, slug })
+      exists = await category.findOne({ user: userObjectId, slug })
     }
 
     return slug // Retorna el slug único generado
@@ -179,9 +188,10 @@ export class categoryModel {
       .replace(/-+$/, '') // Elimina guiones al final
   }
 
-  static async setColumnsOrder ({ user, elementos, parentId }: { user: string, elementos: string[], parentId?: string }): Promise<CategoryErrorResponse> {
+  static async setColumnsOrder ({ userId, elementos, parentId }: { userId: string, elementos: string[], parentId?: mongoose.Types.ObjectId }): Promise<CategoryErrorResponse> {
+    const userObjectId = new mongoose.Types.ObjectId(userId)
     try {
-      if (parentId === null || parentId === undefined || parentId === '') {
+      if (parentId === null || parentId === undefined) {
         return { error: 'Falta el parámetro "escritorio"' }
       }
 
@@ -199,16 +209,16 @@ export class categoryModel {
         console.log(elemento)
         try {
           const updatedElement = await category.findOneAndUpdate(
-            { _id: elemento, user, parentId },
+            { _id: elemento, user: userObjectId, parentId },
             { order: orden },
             { new: true }
           )
 
           if (updatedElement === null) {
-            console.warn(`No se encontró el elemento con _id=${elemento} y escritorio=${parentId}`)
+            console.warn(`No se encontró el elemento con _id=${elemento} y escritorio=${parentId.toString()}`)
           }
         } catch (error) {
-          console.error(`Error al actualizar el elemento con _id=${elemento} y escritorio=${parentId}: ${(error as Error).message}`)
+          console.error(`Error al actualizar el elemento con _id=${elemento} y escritorio=${parentId?.toString()}: ${(error as Error).message}`)
         }
       })
       await Promise.all(updates)
@@ -222,18 +232,19 @@ export class categoryModel {
   }
 
   static async updateNestingCategories ({
-    user,
+    userId,
     categories
   }: {
-    user: string
+    userId: string
     categories: Array<{
       itemId: string
       newOrder: number
       newLevel: number
-      parentId: string | null
+      parentId: mongoose.Types.ObjectId | null
     }>
   }): Promise<{ success: boolean, updatedCount: number, errors: string[] }> {
     const session = await mongoose.startSession()
+    const userObjectId = new mongoose.Types.ObjectId(userId)
     const errors: string[] = []
     let updatedCount = 0
 
@@ -248,7 +259,7 @@ export class categoryModel {
           // Verificar que la categoría existe y pertenece al usuario
           const existingCategory = await category.findOne({
             _id: itemId,
-            user
+            user: userObjectId
           }).session(session)
 
           if (existingCategory === null) {
@@ -269,7 +280,7 @@ export class categoryModel {
 
           // Actualizar la categoría
           const updatedCategory = await category.findOneAndUpdate(
-            { _id: itemId, user },
+            { _id: itemId, user: userObjectId },
             { $set: updateData },
             { new: true, session }
           )
@@ -280,7 +291,7 @@ export class categoryModel {
             // Si se cambió el parentId, también actualizar los links asociados
             if (parentId !== undefined && existingCategory.parentId !== parentId) {
               await link.updateMany(
-                { idpanel: itemId, user },
+                { idpanel: itemId, user: userObjectId },
                 { $set: { parentId } },
                 { session }
               )
@@ -320,10 +331,10 @@ export class categoryModel {
   }
 
   static async updateReorderingCategories ({
-    user,
+    userId,
     categories
   }: {
-    user: string
+    userId: string
     categories: Array<{
       itemId: string
       newOrder: number
@@ -332,6 +343,7 @@ export class categoryModel {
       parentSlug: string | null
     }>
   }): Promise<{ success: boolean, updatedCount: number, errors: string[] }> {
+    const userObjectId = new mongoose.Types.ObjectId(userId)
     const errors: string[] = []
     let updatedCount = 0
     // console.log('🚀 ~ categoryModel ~ updateReorderingCategories ~ user:', parentSlug)
@@ -346,7 +358,7 @@ export class categoryModel {
 
         // Actualizar solo order y level (sin parentId para reordering)
         const result = await category.findOneAndUpdate(
-          { _id: itemId, user },
+          { _id: itemId, user: userObjectId },
           { $set: { order: newOrder, level: newLevel, parentId, parentSlug } },
           { new: true }
         )
@@ -402,12 +414,13 @@ export class categoryModel {
     }
   }
 
-  static async deleteUserData ({ user }: { user: string }): Promise<{ status: string } | { error: string }> {
+  static async deleteUserData ({ userId }: { userId: string }): Promise<{ status: string } | { error: string }> {
+    const userObjectId = new mongoose.Types.ObjectId(userId)
     try {
       // Eliminar todas las categorías del usuario
-      await category.deleteMany({ user })
+      await category.deleteMany({ user: userObjectId })
       // Eliminar todos los links del usuario
-      await link.deleteMany({ user })
+      await link.deleteMany({ user: userObjectId })
 
       return { status: 'Datos del usuario eliminados correctamente' }
     } catch (error) {

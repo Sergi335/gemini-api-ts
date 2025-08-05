@@ -61,8 +61,8 @@ export const categoryParamsSchema = z.object({
 export const createLinkBodySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   description: z.string().optional(),
-  URL: z.string().url('URL inválida'),
-  imgURL: z.string().url().optional(),
+  url: z.string().url('URL inválida'),
+  imgUrl: z.string().url().optional(),
   categoryId: z.string().min(1, 'ID de categoría requerido'),
   order: z.number().int().min(0).optional(),
   notes: z.string().optional(),
@@ -74,8 +74,8 @@ export const updateLinkBodySchema = z.object({
   fields: z.object({
     name: z.string().min(1).optional(),
     description: z.string().optional(),
-    URL: z.string().url().optional(),
-    imgURL: z.string().url().optional(),
+    url: z.string().url().optional(),
+    imgUrl: z.string().url().optional(),
     categoryId: z.string().optional(),
     order: z.number().int().min(0).optional(),
     notes: z.string().optional(),
@@ -120,7 +120,8 @@ export const paginationQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
   search: z.string().optional(),
-  category: z.string().optional()
+  category: z.string().optional(),
+  categoryId: z.string().optional()
 })
 
 // Storage schemas

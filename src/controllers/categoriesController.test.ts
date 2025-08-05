@@ -8,6 +8,7 @@ vi.mock('../models/categoryModel')
 
 // Tipos para el mock
 interface User {
+  _id: string
   name: string
 }
 
@@ -23,7 +24,7 @@ describe('categoriesController', () => {
     vi.clearAllMocks()
 
     mockRequest = {
-      user: { name: 'testuser' },
+      user: { _id: 'testuser', name: 'testuser' },
       body: {}
     }
 
@@ -48,7 +49,7 @@ describe('categoriesController', () => {
         mockResponse as Response
       )
 
-      expect(categoryModel.getAllCategories).toHaveBeenCalledWith({ user: 'testuser' })
+      expect(categoryModel.getAllCategories).toHaveBeenCalledWith({ userId: 'testuser' })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
       expect(mockResponse.json).toHaveBeenCalledWith({
         status: 'success',
@@ -104,7 +105,7 @@ describe('categoriesController', () => {
 
       // Ya no verificamos validateCreateCategory porque se hace en el middleware
       expect(categoryModel.createCategory).toHaveBeenCalledWith({
-        user: 'testuser',
+        userId: 'testuser',
         cleanData: {
           name: 'New Category',
           parentId: 'parent123',
@@ -164,7 +165,7 @@ describe('categoriesController', () => {
 
       // Ya no verificamos validateUpdateCategory porque se hace en el middleware
       expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        user: 'testuser',
+        userId: 'testuser',
         id: 'cat123',
         cleanData: {
           name: 'Updated Category',
@@ -197,7 +198,7 @@ describe('categoriesController', () => {
       )
 
       expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        user: 'testuser',
+        userId: 'testuser',
         id: 'cat123',
         cleanData: {
           name: 'Updated Category',
@@ -248,7 +249,7 @@ describe('categoriesController', () => {
 
       expect(categoryModel.deleteCategory).toHaveBeenCalledWith({
         id: 'cat123',
-        user: 'testuser'
+        userId: 'testuser'
       })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
       expect(mockResponse.json).toHaveBeenCalledWith({
@@ -291,7 +292,7 @@ describe('categoriesController', () => {
       )
 
       expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        user: 'testuser',
+        userId: 'testuser',
         id: 'cat123',
         cleanData: { name: 'Test' },
         elements: null
@@ -313,7 +314,7 @@ describe('categoriesController', () => {
       )
 
       expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        user: 'testuser',
+        userId: 'testuser',
         id: 'cat123',
         cleanData: { name: 'Test' },
         elements: undefined

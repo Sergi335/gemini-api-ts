@@ -212,7 +212,8 @@ export class storageController {
   }
 
   static async getLinkIcons (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?.name
+    const user = req.user?._id
+    const userName = req.user?.name ?? ''
 
     if (user === undefined || user === null || user === '') {
       res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
@@ -222,26 +223,26 @@ export class storageController {
     // De la carpeta 'SergioSR/images/icons' tira toda la app
     // esto es facil de cambiar
     try {
-      const defaultIconsRef = ref(storage, 'SergioSR/images/icons')
-      const defaultList = await listAll(defaultIconsRef)
-      const { items } = defaultList
-      const defaultIconsPromises = items.map(async (back) => ({
-        url: await getDownloadURL(back),
-        nombre: (await getMetadata(back)).name,
-        clase: 'default'
-      }))
-      const icons = await Promise.all(defaultIconsPromises)
+      // const defaultIconsRef = ref(storage, 'SergioSR/images/icons')
+      // const defaultList = await listAll(defaultIconsRef)
+      // const { items } = defaultList
+      // const defaultIconsPromises = items.map(async (back) => ({
+      //   url: await getDownloadURL(back),
+      //   nombre: (await getMetadata(back)).name,
+      //   clase: 'default'
+      // }))
+      // const icons = await Promise.all(defaultIconsPromises)
 
-      const userIconsList = await listAll(ref(storage, `${user}/images/icons`))
+      const userIconsList = await listAll(ref(storage, `${userName}/images/icons`))
       const userIconsPromises = userIconsList.items.map(async (back) => ({
         url: await getDownloadURL(back),
         nombre: (await getMetadata(back)).name,
         clase: 'user'
       }))
       const userIcons = await Promise.all(userIconsPromises)
-      icons.push(...userIcons)
+      // icons.push(...userIcons)
 
-      res.send(icons)
+      res.send(userIcons)
     } catch (err) {
       console.error('Error al leer la carpeta:', err)
       res.send(err)

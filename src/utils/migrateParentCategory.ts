@@ -196,8 +196,8 @@ async function rollbackMigration (): Promise<void> {
       try {
         const updateData: any = {}
 
-        if (typeof category.parentId === 'string' && category.parentId.trim() !== '') {
-          updateData.parentCategory = category.parentId
+        if (category.parentId != null && category.parentId.toString().trim() !== '') {
+          updateData.parentCategory = category.parentId.toString()
         }
 
         await categoryModel.updateOne(

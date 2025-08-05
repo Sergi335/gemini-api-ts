@@ -1,3 +1,8 @@
 
 
-GET http://localhost:3001/api/categories
+GET http://localhost:3001/links
+content-type: application/json
+
+{
+    "user": "SergioSR"
+}

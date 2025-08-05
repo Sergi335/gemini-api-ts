@@ -1,14 +1,15 @@
-import { linkModel } from '../models/linkModel'
 import { Response } from 'express'
-import { validateLink, validatePartialLink } from '../validation/linksZodSchema'
-import { getLinkNameByUrlLocal, getLinkStatusLocal } from '../utils/linksUtils'
+import mongoose from 'mongoose'
+import { linkModel } from '../models/linkModel'
 import { RequestWithUser } from '../types/express'
+import { getLinkNameByUrlLocal, getLinkStatusLocal } from '../utils/linksUtils'
+// import { validatePartialLink } from '../validation/linksZodSchema'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class linksController {
   static async getAllLinks (req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const user = req.user?.name
+      const user = req.user?._id
       if (user === undefined || user === null || user === '') {
         return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
       }
@@ -20,7 +21,7 @@ export class linksController {
   }
 
   static async getLinkById (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name
+    const user = req.user?._id
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
@@ -36,7 +37,7 @@ export class linksController {
 
   static async getAllLinksByCategory (req: RequestWithUser, res: Response): Promise<Response> {
     console.log(req.user)
-    const user = req.user?.name
+    const user = req.user?._id
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
@@ -52,13 +53,19 @@ export class linksController {
   }
 
   static async getLinksCount (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name
+    const user = req.user?._id
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
     try {
-      const category = typeof req.query.category === 'string' ? req.query.category : undefined
-      const linksCount = await linkModel.getLinksCount({ user, category })
+      console.log(req.query)
+
+      const categoryId = typeof req.query.categoryId === 'string' ? req.query.categoryId : undefined
+      console.log('🚀 ~ linksController ~ getLinksCount ~ category:', categoryId)
+      if (categoryId === undefined || categoryId === '') {
+        return res.status(400).json({ status: 'fail', message: 'Categoría no proporcionada' })
+      }
+      const linksCount = await linkModel.getLinksCount({ user, categoryId })
       return res.status(200).json(linksCount)
     } catch (error) {
       return res.status(500).send(error)
@@ -66,32 +73,41 @@ export class linksController {
   }
 
   static async createLink (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name
+    const user = req.user?._id
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
-    const [item] = req.body.data // Esto peta si no es iterable
-    item.user = user
-    const validatedLink = validateLink(item)
-    console.log(validatedLink)
-    // Crear mensaje de error
-    if (!validatedLink.success) {
-      const errorsMessageArray = validatedLink.error?.errors.map((error) => {
-        return error.message
-      })
-      return res.status(400).json({ status: 'fail', message: errorsMessageArray })
-    }
-    const cleanData = validatedLink.data
+    // const [item] = req.body.data // Esto peta si no es iterable
+    // item.user = user
+    // const validatedLink = validateLink(item)
+    // console.log(validatedLink)
+    // // Crear mensaje de error
+    // if (!validatedLink.success) {
+    //   const errorsMessageArray = validatedLink.error?.errors.map((error) => {
+    //     return error.message
+    //   })
+    //   return res.status(400).json({ status: 'fail', message: errorsMessageArray })
+    // }
+    // const cleanData = validatedLink.data
     try {
-      const link = await linkModel.createLink({ cleanData })
-      return res.status(201).json({ status: 'success', link })
+      const link = req.body
+      const userObjectId = new mongoose.Types.ObjectId(user)
+      const cleanData = {
+        ...link,
+        user: userObjectId,
+        categoryId: (link.categoryId != null) ? new mongoose.Types.ObjectId(link.categoryId) : undefined
+      }
+      console.log('🚀 ~ linksController ~ createLink ~ cleanData:', cleanData)
+      const data = await linkModel.createLink({ cleanData })
+      return res.status(201).json({ status: 'success', link: data })
     } catch (error) {
+      console.error('Error en createLink:', error)
       return res.status(500).send(error)
     }
   }
 
   static async updateLink (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name
+    const user = req.user?._id
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
@@ -101,16 +117,17 @@ export class linksController {
     console.log('🚀 ~ file: linksController.js:77 ~ linksController ~ updateLink ~ idpanelOrigen:', idpanelOrigen)
     item.user = user
     console.log(req.body.idpanelOrigen)
-    const validatedLink = validatePartialLink(item)
-    console.log(validatedLink)
+    // const validatedLink = validatePartialLink(item)
+    // console.log(validatedLink)
     const id = req.body.id
-    if (!validatedLink.success) {
-      const errorsMessageArray = validatedLink.error?.errors.map((error) => {
-        return error.message
-      })
-      return res.status(400).json({ status: 'fail', message: errorsMessageArray })
-    }
-    const cleanData = validatedLink.data
+    // if (!validatedLink.success) {
+    //   const errorsMessageArray = validatedLink.error?.errors.map((error) => {
+    //     return error.message
+    //   })
+    //   return res.status(400).json({ status: 'fail', message: errorsMessageArray })
+    // }
+    // const cleanData = validatedLink.data
+    const cleanData = item
     try {
       const link = await linkModel.updateLink({ id, user, idpanelOrigen, cleanData, destinyIds })
       return res.status(200).json({ status: 'success', link })
@@ -122,7 +139,7 @@ export class linksController {
   static async deleteLink (req: RequestWithUser, res: Response): Promise<Response> {
     console.log(req.body.linkId)
     try {
-      const user = req.user?.name
+      const user = req.user?._id
       if (user === undefined || user === null || user === '') {
         return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
       }
@@ -138,7 +155,7 @@ export class linksController {
   }
 
   static async bulkMoveLinks (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name
+    const user = req.user?._id
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
@@ -164,7 +181,7 @@ export class linksController {
   }
 
   static async findDuplicateLinks (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name
+    const user = req.user?._id
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
@@ -173,7 +190,7 @@ export class linksController {
   }
 
   static async setBookMarksOrder (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?.name
+    const user = req.user?._id
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }

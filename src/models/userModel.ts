@@ -1,7 +1,8 @@
-import users from './schemas/userSchema'
+import mongoose from 'mongoose'
+import { User } from '../types/userModel.types'
 import category from './schemas/categorySchema'
 import link from './schemas/linkSchema'
-import mongoose from 'mongoose'
+import users from './schemas/userSchema'
 // import { createRequire } from 'node:module'
 // const customRequire = createRequire(import.meta.url)
 // const dummyData = customRequire('../utils/dummyData.json')
@@ -17,10 +18,15 @@ export class userModel {
     return data
   }
 
-  static async getUser ({ email }: { email: string }): Promise<mongoose.Document | { error: string }> {
+  static async getUser ({ email }: { email: string }): Promise<User | { error: string }> {
     const data = await users.findOne({ email })
     if (data !== null) {
-      return data
+      const userData: User = {
+        _id: String(data._id),
+        email: data.email ?? '',
+        name: data.name ?? ''
+      }
+      return userData
     } else {
       return { error: 'El usuario no existe' }
     }

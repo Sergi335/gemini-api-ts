@@ -4,8 +4,7 @@ import { linksController } from '../../controllers/linksController'
 import {
   createLinkBodySchema,
   deleteLinkBodySchema,
-  paginationQuerySchema,
-  updateLinkBodySchema
+  paginationQuerySchema
 } from '../../middlewares/validation/validationSchemas'
 import { validateBody, validateParams, validateQuery } from '../../middlewares/validation/zodValidator'
 
@@ -45,10 +44,10 @@ linksRouter.post('/',
   validateBody(createLinkBodySchema),
   linksController.createLink
 )
-linksRouter.patch('/',
-  validateBody(updateLinkBodySchema),
-  linksController.updateLink
-)
+// linksRouter.patch('/',
+//   validateBody(updateLinkBodySchema),
+//   linksController.updateLink
+// )
 linksRouter.patch('/move',
   validateBody(z.object({
     sourceCategoryId: z.string().min(1),

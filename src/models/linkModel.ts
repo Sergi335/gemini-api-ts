@@ -1,8 +1,8 @@
+import type { DeleteResult } from 'mongodb'
 import mongoose from 'mongoose'
 import link from './schemas/linkSchema'
-import type { DeleteResult } from 'mongodb'
 
-type LinkCleanData = Omit<{
+interface LinkCleanData {
   name?: string
   description?: string
   url?: string
@@ -15,17 +15,19 @@ type LinkCleanData = Omit<{
   bookmarkOrder?: number
   readList?: boolean
   order?: number
-}, 'user'>
+}
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class linkModel {
   // Quitar try catch lanzar errores con throw y gestionar errores en el controlador
   static async getAllLinks ({ user }: { user: string }): Promise<mongoose.Document[]> {
-    const data = await link.find({ user }).sort({ order: 1 })
+    const userObjectId = new mongoose.Types.ObjectId(user)
+    const data = await link.find({ user: userObjectId }).sort({ order: 1 })
     return data
   }
 
   static async getLinkById ({ user, id }: { user: string, id: string }): Promise<mongoose.Document | { error: string }> {
-    const data = await link.findOne({ user, _id: id })
+    const userObjectId = new mongoose.Types.ObjectId(user)
+    const data = await link.findOne({ user: userObjectId, _id: id })
     if (data != null) {
       return data
     } else {
@@ -34,7 +36,8 @@ export class linkModel {
   }
 
   static async getLinksByTopCategory ({ user, topCategory }: { user: string, topCategory: string }): Promise<mongoose.Document[] | { error: string }> {
-    const data = await link.find({ user, topCategory })
+    const userObjectId = new mongoose.Types.ObjectId(user)
+    const data = await link.find({ user: userObjectId, topCategory })
     if (data.length > 0) {
       return data
     } else {
@@ -42,32 +45,46 @@ export class linkModel {
     }
   }
 
-  static async getLinksCount ({ user, category }: { user: string, category?: string }): Promise<number> {
+  static async getLinksCount ({ user, categoryId }: { user: string, categoryId?: string }): Promise<number | { error: string }> {
+    const userObjectId = new mongoose.Types.ObjectId(user)
     let data
-    if (typeof category === 'string' && category.trim() !== '') {
-      data = await link.countDocuments({ user, categoryId: category })
+    if (typeof categoryId === 'string' && categoryId.trim() !== '') {
+      const categoryObjectId = new mongoose.Types.ObjectId(categoryId)
+      data = await link.countDocuments({ user: userObjectId, categoryId: categoryObjectId })
     } else {
-      data = await link.countDocuments({ user })
+      data = await link.countDocuments({ user: userObjectId })
+    }
+    if (data === undefined) {
+      return { error: 'Categoría no encontrada' }
     }
     return data
   }
 
   static async createLink ({ cleanData }: { cleanData: LinkCleanData }): Promise<mongoose.Document> {
-    console.log(cleanData)
+    console.log('🚀 ~ linkModel ~ createLink ~ cleanData:', cleanData)
+
     // gestionar errores aqui --- ver node midu
     const data = await link.create({ ...cleanData })
+    console.log('🚀 ~ linkModel ~ createLink ~ data:', data)
     return data
   }
 
   static async updateLink ({ id, user, idpanelOrigen, cleanData, destinyIds }: { id: string, user: string, idpanelOrigen?: string, cleanData: LinkCleanData, destinyIds?: string[] }): Promise<mongoose.Document | { error: string }> {
     console.log('🚀 ~ file: linkModel.js:41 ~ linkModel ~ updateLink ~ cleanData:', cleanData)
     console.log('🚀 ~ file: linkModel.js:41 ~ linkModel ~ updateLink ~ destinyIds:', destinyIds)
-    const data = await link.findOneAndUpdate({ _id: id, user }, { $set: { ...cleanData } }, { new: true })
-    if (idpanelOrigen !== undefined) {
-      await linkModel.sortLinks({ idpanelOrigen })
+    const userObjectId = new mongoose.Types.ObjectId(user)
+    const cleanDataWithUser = {
+      ...cleanData,
+      user: userObjectId,
+      categoryId: (cleanData.categoryId !== undefined && cleanData.categoryId !== null && cleanData.categoryId.trim() !== '') ? new mongoose.Types.ObjectId(cleanData.categoryId) : undefined
     }
-    if (idpanelOrigen !== undefined && destinyIds !== undefined && typeof cleanData.categoryId === 'string') {
-      await linkModel.sortLinks({ idpanelOrigen: cleanData.categoryId, elementos: destinyIds })
+    const data = await link.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: cleanDataWithUser }, { new: true })
+    if (idpanelOrigen !== undefined) {
+      const idpanelOrigenObjectId = new mongoose.Types.ObjectId(idpanelOrigen)
+      await linkModel.sortLinks({ idpanelOrigen: idpanelOrigenObjectId })
+    }
+    if (idpanelOrigen !== undefined && destinyIds !== undefined && cleanData.categoryId !== undefined) {
+      await linkModel.sortLinks({ idpanelOrigen: new mongoose.Types.ObjectId(cleanData.categoryId), elementos: destinyIds })
     }
     if (data == null) {
       return { error: 'El link no existe' }
@@ -76,7 +93,9 @@ export class linkModel {
   }
 
   static async bulkMoveLinks ({ user, source, destiny, panel, links, escritorio }: { user: string, source: string, destiny: string, panel: string, links: string[], escritorio?: string }): Promise<mongoose.UpdateWriteOpResult | { error: string }> {
-    const data = await link.updateMany({ _id: { $in: links }, user }, { $set: { categoryId: destiny, categoryName: panel, escritorio } })
+    const userObjectId = new mongoose.Types.ObjectId(user)
+    const destinyObjectId = new mongoose.Types.ObjectId(destiny)
+    const data = await link.updateMany({ _id: { $in: links }, user: userObjectId }, { $set: { categoryId: destinyObjectId, categoryName: panel, escritorio } })
     if (data.modifiedCount === 0) {
       return { error: 'No se movieron enlaces' }
     }
@@ -84,17 +103,18 @@ export class linkModel {
   }
 
   static async deleteLink ({ user, linkId }: { user: string, linkId: string | string[] }): Promise<mongoose.Document | DeleteResult | { error: string }> {
+    const userObjectId = new mongoose.Types.ObjectId(user)
     if (Array.isArray(linkId)) {
-      const data = await link.deleteMany({ _id: { $in: linkId }, user })
+      const data = await link.deleteMany({ _id: { $in: linkId }, user: userObjectId })
       // if (data) {
       //   await linkModel.sortLinks({ idpanelOrigen: data[0].idpanel }) -> Ordenar links que quedan en el panel
       // }
       return data // la data puede ser un error
     } else {
-      const data = await link.findOneAndDelete({ _id: linkId, user })
+      const data = await link.findOneAndDelete({ _id: linkId, user: userObjectId })
       if (data != null) {
-        if (data.categoryId != null && data.categoryId.trim() !== '') {
-          await linkModel.sortLinks({ idpanelOrigen: data.categoryId })
+        if (data.categoryId != null && data.categoryId.toString().trim() !== '') {
+          await linkModel.sortLinks({ idpanelOrigen: new mongoose.Types.ObjectId(data.categoryId) })
         }
         return data
       } else {
@@ -105,15 +125,16 @@ export class linkModel {
 
   static async findDuplicateLinks ({ user }: { user: string }): Promise<mongoose.Document[] | { error: string }> {
     try {
+      const userObjectId = new mongoose.Types.ObjectId(user)
       const duplicados = await link.aggregate([
-        { $match: { user } }, // Filtrar por el usuario específico
+        { $match: { user: userObjectId } }, // Filtrar por el usuario específico
         { $group: { _id: '$url', count: { $sum: 1 } } },
         { $match: { count: { $gt: 1 } } }
       ])
       const search = await Promise.all(
         duplicados.map(async (item) => {
           try {
-            const objeto = await link.find({ url: item._id, user })
+            const objeto = await link.find({ url: item._id, user: userObjectId })
             return objeto
           } catch (error) {
             console.error('Error en la búsqueda:', error)
@@ -183,11 +204,12 @@ export class linkModel {
   }
 
   static async searchLinks ({ user, query }: { user: string, query: string }): Promise<mongoose.Document[]> {
+    const userObjectId = new mongoose.Types.ObjectId(user)
     const data = await link.find({
       $or: [
-        { name: query, user },
-        { url: query, user },
-        { notes: query, user }
+        { name: query, user: userObjectId },
+        { url: query, user: userObjectId },
+        { notes: query, user: userObjectId }
       ]
     })
     return data
@@ -195,9 +217,10 @@ export class linkModel {
 
   static async setBookMarksOrder ({ user, links }: { user: string, links: Array<[string, number]> }): Promise<Array<{ id: string, order: number }>> {
     try {
+      const userObjectId = new mongoose.Types.ObjectId(user)
       const updateOperations = links.map(([linkId, order]) => ({
         updateOne: {
-          filter: { _id: linkId, user },
+          filter: { _id: new mongoose.Types.ObjectId(linkId), user: userObjectId },
           update: { $set: { bookmarkOrder: order } }
         }
       }))
@@ -213,7 +236,7 @@ export class linkModel {
   }
 
   // Elementos son los ids de los elementos hacia o desde el panel al que se mueve el link
-  static async sortLinks ({ idpanelOrigen, elementos }: { idpanelOrigen: string, elementos?: string[] }): Promise<{ message: string } | { error: any }> {
+  static async sortLinks ({ idpanelOrigen, elementos }: { idpanelOrigen: mongoose.Types.ObjectId, elementos?: string[] }): Promise<{ message: string } | { error: any }> {
     let dataToSort
     if (elementos === undefined) {
       const links = await link.find({ categoryId: idpanelOrigen }).sort({ order: 1 }).select('_id')

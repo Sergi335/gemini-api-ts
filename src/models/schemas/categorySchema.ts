@@ -1,15 +1,12 @@
 import { Schema, model } from 'mongoose'
 
 const CategorySchema = new Schema({
-  _id: {
-    type: String,
-    required: true
-  },
   name: {
     type: String
   },
   parentId: {
-    type: String
+    type: Schema.Types.ObjectId
+    // ref: 'category' // opcional, para population
   },
   isEmpty: {
     type: Boolean
@@ -18,7 +15,8 @@ const CategorySchema = new Schema({
     type: Number
   },
   user: {
-    type: String
+    type: Schema.Types.ObjectId // Cambiar a ObjectId
+    // ref: 'User' // opcional, para population
   },
   slug: {
     type: String,

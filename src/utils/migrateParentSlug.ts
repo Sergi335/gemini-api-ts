@@ -69,7 +69,7 @@ async function migrateParentSlug (): Promise<void> {
       if (sample.length > 0) {
         console.log(`\n📋 Nivel ${level}:`)
         sample.forEach((cat, index) => {
-          console.log(`  ${index + 1}. ID: ${String(cat._id)} | Slug: ${cat.slug ?? 'undefined'} | ParentId: ${cat.parentId ?? 'null'}`)
+          console.log(`  ${index + 1}. ID: ${String(cat._id)} | Slug: ${cat.slug ?? 'undefined'} | ParentId: ${cat.parentId?.toString() ?? 'null'}`)
         })
       }
     }
@@ -116,9 +116,9 @@ async function migrateParentSlug (): Promise<void> {
         console.log(`\n🔄 Procesando categoría ${String(category._id)}:`)
         console.log(`   Slug: ${category.slug ?? 'undefined'}`)
         console.log(`   Level: ${category.level}`)
-        console.log(`   ParentId: ${category.parentId ?? 'null'}`)
+        console.log(`   ParentId: ${category.parentId?.toString() ?? 'null'}`)
 
-        if (category.parentId === null || category.parentId === undefined || category.parentId === '') {
+        if (category.parentId === null || category.parentId === undefined || category.parentId.toString() === '') {
           console.log('   ⚠️  Sin parentId, saltando...')
           skippedCount++
           continue
@@ -238,7 +238,7 @@ async function checkParentSlugStatus (): Promise<void> {
 
       console.log('\n🔍 Ejemplos de categorías que necesitan migración:')
       problematicCategories.forEach((cat, index) => {
-        console.log(`  ${index + 1}. ${cat.slug ?? 'undefined'} (Level: ${cat.level}, ParentId: ${cat.parentId ?? 'null'})`)
+        console.log(`  ${index + 1}. ${cat.slug ?? 'undefined'} (Level: ${cat.level}, ParentId: ${cat.parentId?.toString() ?? 'null'})`)
       })
     } else {
       console.log('\n✅ Todas las categorías con padre tienen parentSlug configurado')

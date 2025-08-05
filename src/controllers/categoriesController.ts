@@ -8,8 +8,11 @@ export class categoriesController {
   static async getAllCategories (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       // Usuario ya validado por middleware validateUser
-      const user = req.user?.name as string
-      const data = await categoryModel.getAllCategories({ user })
+      const userId = req.user?._id as string
+      if (userId === undefined || userId === null || userId === '') {
+        return res.status(401).json({ status: 'fail', error: 'User ID is missing' })
+      }
+      const data = await categoryModel.getAllCategories({ userId })
       return res.status(200).json({ status: 'success', data })
     } catch (error) {
       return res.status(500).send({ status: 'fail', error })
@@ -19,8 +22,21 @@ export class categoriesController {
   static async getTopLevelCategories (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       // Usuario ya validado por middleware validateUser
-      const user = req.user?.name as string
-      const data = await categoryModel.getTopLevelCategories({ user })
+      const userId = req.user?._id as string
+      const data = await categoryModel.getTopLevelCategories({ userId })
+      return res.status(200).json({ status: 'success', data })
+    } catch (error) {
+      return res.status(500).send({ status: 'fail', error })
+    }
+  }
+
+  static async getCategoriesByParentSlug (req: RequestWithUser, res: Response): Promise<Response> {
+    try {
+      // Usuario ya validado por middleware validateUser
+      const userId = req.user?._id as string
+      const { slug } = req.params
+      console.log('🚀 ~ categoriesController ~ getCategoriesByParentSlug ~ slug:', slug)
+      const data = await categoryModel.getCategoriesByParentSlug({ userId, parentSlug: slug })
       return res.status(200).json({ status: 'success', data })
     } catch (error) {
       return res.status(500).send({ status: 'fail', error })
@@ -30,11 +46,11 @@ export class categoriesController {
   static async updateNestingCategories (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       // Usuario ya validado por middleware validateUser
-      const user = req.user?.name as string
+      const userId = req.user?._id as string
       // Body ya validado por middleware validateBody
       const { updates } = req.body
 
-      const result = await categoryModel.updateNestingCategories({ user, categories: updates })
+      const result = await categoryModel.updateNestingCategories({ userId, categories: updates })
 
       if (result.success) {
         return res.status(200).json({
@@ -58,12 +74,12 @@ export class categoriesController {
   static async updateReorderingCategories (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       // Usuario ya validado por middleware validateUser
-      const user = req.user?.name as string
-      console.log('🚀 ~ categoriesController ~ updateReorderingCategories ~ user:', user)
+      const userId = req.user?._id as string
+      console.log('🚀 ~ categoriesController ~ updateReorderingCategories ~ userId:', userId)
       // Body ya validado por middleware validateBody
       const { updates } = req.body
 
-      const result = await categoryModel.updateReorderingCategories({ user, categories: updates })
+      const result = await categoryModel.updateReorderingCategories({ userId, categories: updates })
 
       if (result.success) {
         return res.status(200).json({
@@ -87,11 +103,11 @@ export class categoriesController {
   static async createCategory (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       // Usuario ya validado por middleware validateUser
-      const user = req.user?.name as string
+      const userId = req.user?._id as string
       // Body ya validado por middleware validateBody
-      req.body.user = user
+      req.body.user = userId
       const cleanData = req.body
-      const category = await categoryModel.createCategory({ user, cleanData })
+      const category = await categoryModel.createCategory({ userId, cleanData })
       return res.status(201).json({ status: 'success', category })
     } catch (error) {
       return res.status(500).send({ status: 'fail', error })
@@ -101,12 +117,12 @@ export class categoriesController {
   static async updateCategory (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       // Usuario ya validado por middleware validateUser
-      const user = req.user?.name as string
+      const userId = req.user?._id as string
       // Body ya validado por middleware validateBody
       const { fields, id, columnsIds } = req.body
       const elements = columnsIds // Mantener compatibilidad con el modelo
 
-      const column = await categoryModel.updateCategory({ user, id, cleanData: fields, elements })
+      const column = await categoryModel.updateCategory({ userId, id, cleanData: fields, elements })
       return res.status(200).json({ status: 'success', column })
     } catch (error) {
       return res.status(500).send({ status: 'fail', error })
@@ -116,10 +132,10 @@ export class categoriesController {
   static async deleteCategory (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       // Usuario ya validado por middleware validateUser
-      const user = req.user?.name as string
+      const userId = req.user?._id as string
       // Body ya validado por middleware validateBody
       const { id } = req.body
-      const column = await categoryModel.deleteCategory({ id, user })
+      const column = await categoryModel.deleteCategory({ id, userId })
       return res.status(200).json({ status: 'success', column })
     } catch (error) {
       return res.status(500).send({ status: 'fail', error })

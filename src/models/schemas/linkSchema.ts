@@ -18,13 +18,13 @@ const LinkSchema = new Schema({
     type: String
   },
   categoryId: {
-    type: String
+    type: Schema.Types.ObjectId // Cambiar a ObjectId
   },
   order: {
     type: Number
   },
   user: {
-    type: String
+    type: Schema.Types.ObjectId // Cambiar a ObjectId
   },
   notes: {
     type: String

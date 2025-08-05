@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import link from './schemas/linkSchema'
-import { linkModel } from './linkModel'
 import type { DeleteResult } from 'mongodb'
+import mongoose from 'mongoose'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { linkModel } from './linkModel'
+import link from './schemas/linkSchema'
 
 vi.mock('./schemas/linkSchema')
 
@@ -98,7 +99,7 @@ describe('linkModel', () => {
       // @ts-expect-error
       link.countDocuments.mockResolvedValue(3)
 
-      const result = await linkModel.getLinksCount({ user: 'user1', category: 'cat1' })
+      const result = await linkModel.getLinksCount({ user: 'user1', categoryId: 'cat1' })
 
       expect(link.countDocuments).toHaveBeenCalledWith({ user: 'user1', categoryId: 'cat1' })
       expect(result).toBe(3)
@@ -108,7 +109,7 @@ describe('linkModel', () => {
       // @ts-expect-error
       link.countDocuments.mockResolvedValue(5)
 
-      const result = await linkModel.getLinksCount({ user: 'user1', category: '  ' })
+      const result = await linkModel.getLinksCount({ user: 'user1', categoryId: '  ' })
 
       expect(link.countDocuments).toHaveBeenCalledWith({ user: 'user1' })
       expect(result).toBe(5)
@@ -572,7 +573,7 @@ describe('linkModel', () => {
       link.findOneAndUpdate.mockResolvedValue({})
 
       const result = await linkModel.sortLinks({
-        idpanelOrigen: 'cat1'
+        idpanelOrigen: new mongoose.Types.ObjectId('cat1')
       })
 
       expect(result).toEqual({ message: 'success' })
@@ -584,7 +585,7 @@ describe('linkModel', () => {
       link.findOneAndUpdate.mockResolvedValue({})
 
       const result = await linkModel.sortLinks({
-        idpanelOrigen: 'cat1',
+        idpanelOrigen: new mongoose.Types.ObjectId('cat1'),
         elementos
       })
 
@@ -601,7 +602,7 @@ describe('linkModel', () => {
       }))
 
       const result = await linkModel.sortLinks({
-        idpanelOrigen: 'cat1'
+        idpanelOrigen: new mongoose.Types.ObjectId('cat1')
       })
 
       expect(result).toEqual({ message: 'success' })
