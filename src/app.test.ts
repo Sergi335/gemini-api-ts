@@ -1,6 +1,14 @@
 import request from 'supertest'
+import { describe, expect, it, vi } from 'vitest'
+
+// Mock MongoDB connection para tests unitarios
+vi.mock('./config/mongodb', () => ({
+  dbConnect: vi.fn().mockResolvedValue(undefined)
+}))
+
+// Importar app después del mock
+// eslint-disable-next-line import/first
 import app from './app'
-import { describe, it, expect } from 'vitest'
 
 describe('GET /health', () => {
   it('debe responder con status ok', async () => {

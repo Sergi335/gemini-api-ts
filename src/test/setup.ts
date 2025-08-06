@@ -1,4 +1,4 @@
-// Setup global para tests de integración
+// Setup global para tests
 import { vi } from 'vitest'
 
 // Mock global de Firebase Admin

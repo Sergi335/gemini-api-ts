@@ -1,30 +1,30 @@
 // Tipos específicos para operaciones de Links
 
 // Datos limpios de link sin el campo user para respuestas
-export type LinkCleanData = Omit<{
-  _id?: string
-  name?: string
-  description?: string
-  url?: string
-  imgUrl?: string
-  categoryName?: string
-  categoryId?: string
-  order?: number
-  notes?: string
-  images?: string[]
-  bookmark?: boolean
-  bookmarkOrder?: number
-  readlist?: boolean
-  createdAt?: Date
-  updatedAt?: Date
-}, 'user'>
+// export type LinkCleanData = Omit<{
+//   _id?: string
+//   name?: string
+//   description?: string
+//   url?: string
+//   imgUrl?: string
+//   categoryName?: string
+//   categoryId?: string
+//   order?: number
+//   notes?: string
+//   images?: string[]
+//   bookmark?: boolean
+//   bookmarkOrder?: number
+//   readlist?: boolean
+//   createdAt?: Date
+//   updatedAt?: Date
+// }, 'user'>
 
 // Respuesta exitosa para operaciones de movimiento de links
-export interface MoveLinkResponse {
-  success: boolean
-  message: string
-  data?: LinkCleanData
-}
+// export interface MoveLinkResponse {
+//   success: boolean
+//   message: string
+//   data?: LinkCleanData
+// }
 
 // Respuesta de error para operaciones de links
 export interface LinkErrorResponse {
@@ -48,4 +48,10 @@ export interface BookmarkUpdateData {
 // Tipo para operaciones de readlist
 export interface ReadlistUpdateData {
   readlist: boolean
+}
+export interface CreateLinkData {
+  user: string
+  categoryId: string
+  name: string
+  url: string
 }

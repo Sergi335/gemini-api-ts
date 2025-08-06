@@ -1,17 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Response } from 'express'
-import { storageController } from './storageController'
+import {
+  deleteObject,
+  getDownloadURL,
+  getMetadata,
+  listAll,
+  ref,
+  uploadBytes
+} from 'firebase/storage'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { linkModel } from '../models/linkModel'
 import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
-import {
-  getDownloadURL,
-  getMetadata,
-  uploadBytes,
-  deleteObject,
-  listAll,
-  ref
-} from 'firebase/storage'
+import { storageController } from './storageController'
 
 // Mock de Firebase Storage
 vi.mock('firebase/storage', () => ({
@@ -480,10 +480,22 @@ describe('storageController', () => {
       const mockMetadata = { name: 'test.png' }
       const mockUrl = 'https://storage.googleapis.com/test.png'
 
-      vi.mocked(ref).mockReturnValue({} as any)
-      vi.mocked(listAll)
-        .mockResolvedValueOnce({ items: mockDefaultItems } as any)
-        .mockResolvedValueOnce({ items: mockUserItems } as any)
+      // Asegurarse de que ref se mockea correctamente para cada llamada
+      const defaultRef = { fullPath: 'default/icons' }
+      const userRef = { fullPath: 'testuser/icons' }
+      vi.mocked(ref).mockImplementation((storage, path) => {
+        if (typeof path === 'string' && path.includes('default')) return defaultRef as any
+        return userRef as any
+      })
+
+      // Mockear listAll para que devuelva diferentes items según la referencia
+      vi.mocked(listAll).mockImplementation(async (refValue) => {
+        if (refValue.fullPath.includes('default')) {
+          return { items: mockDefaultItems } as any
+        }
+        return { items: mockUserItems } as any
+      })
+
       vi.mocked(getMetadata).mockResolvedValue(mockMetadata as any)
       vi.mocked(getDownloadURL).mockResolvedValue(mockUrl)
 
@@ -492,6 +504,10 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
+      // Verificar que se llamó a listAll dos veces
+      expect(listAll).toHaveBeenCalledTimes(2)
+
+      // Verificar el contenido de la respuesta
       expect(mockResponse.send).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
@@ -512,8 +528,9 @@ describe('storageController', () => {
   describe('deleteAllUserFiles', () => {
     it('elimina todos los archivos del usuario exitosamente', async () => {
       const mockItems = [{ name: 'file1.jpg' }, { name: 'file2.png' }]
+      const folders = ['images/backgrounds', 'images/linkImages', 'images/profileImages', 'icons', 'backups']
 
-      vi.mocked(ref).mockReturnValue({} as any)
+      // Mock listAll para que devuelva items para cada carpeta
       vi.mocked(listAll).mockResolvedValue({ items: mockItems } as any)
       vi.mocked(deleteObject).mockResolvedValue()
 
@@ -522,8 +539,10 @@ describe('storageController', () => {
       expect(result).toEqual({
         message: 'Todos los archivos del usuario han sido eliminados'
       })
-      // Se llama a listAll 5 veces (5 carpetas) y deleteObject 2 veces por cada carpeta
-      expect(deleteObject).toHaveBeenCalledTimes(mockItems.length * 5)
+      // Se llama a listAll para cada carpeta
+      expect(listAll).toHaveBeenCalledTimes(folders.length)
+      // Se llama a deleteObject para cada archivo en cada carpeta
+      expect(deleteObject).toHaveBeenCalledTimes(mockItems.length * folders.length)
     })
 
     it('maneja errores durante la eliminación', async () => {

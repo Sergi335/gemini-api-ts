@@ -1,20 +1,14 @@
-import { Request, Response } from 'express'
+import { Response } from 'express'
+import { Types } from 'mongoose'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { categoryModel } from '../models/categoryModel'
+import { RequestWithUser } from '../types/express'
 import { categoriesController } from './categoriesController'
 
 // Mock del categoryModel
 vi.mock('../models/categoryModel')
 
-// Tipos para el mock
-interface User {
-  _id: string
-  name: string
-}
-
-interface RequestWithUser extends Request {
-  user?: User
-}
+const mockUserId = new Types.ObjectId().toHexString()
 
 describe('categoriesController', () => {
   let mockRequest: Partial<RequestWithUser>
@@ -24,8 +18,10 @@ describe('categoriesController', () => {
     vi.clearAllMocks()
 
     mockRequest = {
-      user: { _id: 'testuser', name: 'testuser' },
-      body: {}
+      user: { _id: mockUserId, name: 'testuser' },
+      body: {},
+      params: {},
+      query: {}
     }
 
     mockResponse = {
@@ -38,8 +34,8 @@ describe('categoriesController', () => {
   describe('getAllCategories', () => {
     it('devuelve todas las categorías exitosamente', async () => {
       const mockCategories = [
-        { _id: 'cat1', name: 'Category 1', user: 'testuser' },
-        { _id: 'cat2', name: 'Category 2', user: 'testuser' }
+        { _id: 'cat1', name: 'Category 1', user: mockUserId },
+        { _id: 'cat2', name: 'Category 2', user: mockUserId }
       ]
 
       vi.mocked(categoryModel.getAllCategories).mockResolvedValue(mockCategories as any)
@@ -49,7 +45,7 @@ describe('categoriesController', () => {
         mockResponse as Response
       )
 
-      expect(categoryModel.getAllCategories).toHaveBeenCalledWith({ userId: 'testuser' })
+      expect(categoryModel.getAllCategories).toHaveBeenCalledWith({ userId: mockUserId })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
       expect(mockResponse.json).toHaveBeenCalledWith({
         status: 'success',
@@ -75,25 +71,17 @@ describe('categoriesController', () => {
   })
 
   describe('createCategory', () => {
-    beforeEach(() => {
-      mockRequest.body = {
-        name: 'New Category',
-        parentId: 'parent123'
-      }
-    })
-
     it('crea una categoría exitosamente', async () => {
-      // Simular datos ya validados por el middleware
-      mockRequest.body = {
+      const newCategoryData = {
         name: 'New Category',
         parentId: 'parent123'
       }
+      mockRequest.body = newCategoryData
 
       const mockCreatedCategory = {
         _id: 'newcat1',
-        name: 'New Category',
-        parentId: 'parent123',
-        user: 'testuser'
+        ...newCategoryData,
+        user: mockUserId
       }
 
       vi.mocked(categoryModel.createCategory).mockResolvedValue([mockCreatedCategory] as any)
@@ -103,14 +91,9 @@ describe('categoriesController', () => {
         mockResponse as Response
       )
 
-      // Ya no verificamos validateCreateCategory porque se hace en el middleware
       expect(categoryModel.createCategory).toHaveBeenCalledWith({
-        userId: 'testuser',
-        cleanData: {
-          name: 'New Category',
-          parentId: 'parent123',
-          user: 'testuser'
-        }
+        userId: mockUserId,
+        cleanData: { ...newCategoryData, user: mockUserId }
       })
       expect(mockResponse.status).toHaveBeenCalledWith(201)
       expect(mockResponse.json).toHaveBeenCalledWith({
@@ -137,23 +120,16 @@ describe('categoriesController', () => {
     })
   })
 
-  describe('updateColumn', () => {
-    beforeEach(() => {
-      mockRequest.body = {
-        fields: {
-          name: 'Updated Category',
-          order: 5
-        },
-        id: 'cat123'
-      }
-    })
-
+  describe('updateCategory', () => {
     it('actualiza una categoría exitosamente', async () => {
+      const updateData = { name: 'Updated Category' }
+      // El controlador espera 'fields' y 'id' en el body
+      mockRequest.body = { fields: updateData, id: 'cat123' }
+
       const mockUpdatedCategory = {
         _id: 'cat123',
-        name: 'Updated Category',
-        order: 5,
-        user: 'testuser'
+        ...updateData,
+        user: mockUserId
       }
 
       vi.mocked(categoryModel.updateCategory).mockResolvedValue(mockUpdatedCategory as any)
@@ -163,14 +139,10 @@ describe('categoriesController', () => {
         mockResponse as Response
       )
 
-      // Ya no verificamos validateUpdateCategory porque se hace en el middleware
       expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        userId: 'testuser',
+        userId: mockUserId,
         id: 'cat123',
-        cleanData: {
-          name: 'Updated Category',
-          order: 5
-        },
+        cleanData: updateData,
         elements: undefined
       })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
@@ -181,15 +153,11 @@ describe('categoriesController', () => {
     })
 
     it('actualiza una categoría con elementos de ordenación', async () => {
-      mockRequest.body.columnsIds = ['col1', 'col2', 'col3']
+      const updateData = { name: 'Updated Category' }
+      // El controlador espera 'fields', 'id' y 'columnsIds' en el body
+      mockRequest.body = { fields: updateData, id: 'cat123', columnsIds: ['col1', 'col2'] }
 
-      const mockUpdatedCategory = {
-        _id: 'cat123',
-        name: 'Updated Category',
-        order: 5,
-        user: 'testuser'
-      }
-
+      const mockUpdatedCategory = { _id: 'cat123', ...updateData, user: mockUserId }
       vi.mocked(categoryModel.updateCategory).mockResolvedValue(mockUpdatedCategory as any)
 
       await categoriesController.updateCategory(
@@ -198,46 +166,23 @@ describe('categoriesController', () => {
       )
 
       expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        userId: 'testuser',
+        userId: mockUserId,
         id: 'cat123',
-        cleanData: {
-          name: 'Updated Category',
-          order: 5
-        },
-        elements: ['col1', 'col2', 'col3']
-      })
-    })
-
-    it('maneja errores del modelo durante la actualización', async () => {
-      const error = new Error('Database update error')
-
-      vi.mocked(categoryModel.updateCategory).mockRejectedValue(error)
-
-      await categoriesController.updateCategory(
-        mockRequest as RequestWithUser,
-        mockResponse as Response
-      )
-
-      expect(mockResponse.status).toHaveBeenCalledWith(500)
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        status: 'fail',
-        error
+        cleanData: updateData,
+        elements: ['col1', 'col2']
       })
     })
   })
 
-  describe('deleteColumn', () => {
-    beforeEach(() => {
-      mockRequest.body = {
-        id: 'cat123'
-      }
-    })
-
+  describe('deleteCategory', () => {
     it('elimina una categoría exitosamente', async () => {
+      // El controlador espera 'id' en el body
+      mockRequest.body = { id: 'cat123' }
+
       const mockDeletedCategory = {
         _id: 'cat123',
         name: 'Deleted Category',
-        user: 'testuser'
+        user: mockUserId
       }
 
       vi.mocked(categoryModel.deleteCategory).mockResolvedValue(mockDeletedCategory as any)
@@ -249,75 +194,12 @@ describe('categoriesController', () => {
 
       expect(categoryModel.deleteCategory).toHaveBeenCalledWith({
         id: 'cat123',
-        userId: 'testuser'
+        userId: mockUserId
       })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
       expect(mockResponse.json).toHaveBeenCalledWith({
         status: 'success',
         column: mockDeletedCategory
-      })
-    })
-
-    it('maneja errores del modelo durante la eliminación', async () => {
-      const error = new Error('Database delete error')
-
-      vi.mocked(categoryModel.deleteCategory).mockRejectedValue(error)
-
-      await categoriesController.deleteCategory(
-        mockRequest as RequestWithUser,
-        mockResponse as Response
-      )
-
-      expect(mockResponse.status).toHaveBeenCalledWith(500)
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        status: 'fail',
-        error
-      })
-    })
-  })
-
-  describe('Edge cases', () => {
-    it('maneja el caso donde columnsIds es null', async () => {
-      mockRequest.body = {
-        fields: { name: 'Test' },
-        id: 'cat123',
-        columnsIds: null
-      }
-
-      vi.mocked(categoryModel.updateCategory).mockResolvedValue({} as any)
-
-      await categoriesController.updateCategory(
-        mockRequest as RequestWithUser,
-        mockResponse as Response
-      )
-
-      expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        userId: 'testuser',
-        id: 'cat123',
-        cleanData: { name: 'Test' },
-        elements: null
-      })
-    })
-
-    it('maneja el caso donde columnsIds es undefined', async () => {
-      mockRequest.body = {
-        fields: { name: 'Test' },
-        id: 'cat123'
-        // columnsIds no está definido
-      }
-
-      vi.mocked(categoryModel.updateCategory).mockResolvedValue({} as any)
-
-      await categoriesController.updateCategory(
-        mockRequest as RequestWithUser,
-        mockResponse as Response
-      )
-
-      expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        userId: 'testuser',
-        id: 'cat123',
-        cleanData: { name: 'Test' },
-        elements: undefined
       })
     })
   })

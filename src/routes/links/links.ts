@@ -59,7 +59,7 @@ linksRouter.patch('/move',
 )
 linksRouter.patch('/setbookmarksorder',
   validateBody(z.object({
-    links: z.array(z.string())
+    links: z.array(z.tuple([z.string(), z.number()]))
   })),
   linksController.setBookMarksOrder
 )

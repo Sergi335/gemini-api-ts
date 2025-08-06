@@ -82,7 +82,7 @@ export const updateLinkBodySchema = z.object({
     bookmark: z.boolean().optional()
   }).optional(),
   oldCategoryId: z.string().optional(),
-  newCategoryId: z.string().optional()
+  destinyIds: z.array(z.string()).optional()
 })
 
 export const deleteLinkBodySchema = z.object({

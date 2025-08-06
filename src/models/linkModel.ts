@@ -2,7 +2,13 @@ import type { DeleteResult } from 'mongodb'
 import mongoose from 'mongoose'
 import link from './schemas/linkSchema'
 
-interface LinkCleanData {
+export interface LinkCleanData {
+  id: string
+  oldCategoryId?: string
+  destinyIds?: string[]
+  fields?: Fields
+}
+interface Fields {
   name?: string
   description?: string
   url?: string
@@ -15,6 +21,12 @@ interface LinkCleanData {
   bookmarkOrder?: number
   readList?: boolean
   order?: number
+}
+interface CreateLinkData {
+  user: string
+  categoryId: string
+  name: string
+  url: string
 }
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class linkModel {
@@ -60,7 +72,7 @@ export class linkModel {
     return data
   }
 
-  static async createLink ({ cleanData }: { cleanData: LinkCleanData }): Promise<mongoose.Document> {
+  static async createLink ({ cleanData }: { cleanData: CreateLinkData }): Promise<mongoose.Document> {
     console.log('🚀 ~ linkModel ~ createLink ~ cleanData:', cleanData)
 
     // gestionar errores aqui --- ver node midu
@@ -69,22 +81,21 @@ export class linkModel {
     return data
   }
 
-  static async updateLink ({ id, user, idpanelOrigen, cleanData, destinyIds }: { id: string, user: string, idpanelOrigen?: string, cleanData: LinkCleanData, destinyIds?: string[] }): Promise<mongoose.Document | { error: string }> {
-    console.log('🚀 ~ file: linkModel.js:41 ~ linkModel ~ updateLink ~ cleanData:', cleanData)
-    console.log('🚀 ~ file: linkModel.js:41 ~ linkModel ~ updateLink ~ destinyIds:', destinyIds)
+  static async updateLink ({ id, user, oldCategoryId, fields, destinyIds }: { id: string, user: string, oldCategoryId?: string, fields?: Fields, destinyIds?: [] }): Promise<mongoose.Document | { error: string }> {
     const userObjectId = new mongoose.Types.ObjectId(user)
-    const cleanDataWithUser = {
-      ...cleanData,
-      user: userObjectId,
-      categoryId: (cleanData.categoryId !== undefined && cleanData.categoryId !== null && cleanData.categoryId.trim() !== '') ? new mongoose.Types.ObjectId(cleanData.categoryId) : undefined
+    // const cleanDataWithUser = {
+    //   ...cleanData,
+    //   user: userObjectId,
+    //   categoryId: (cleanData.fields?.categoryId !== undefined && cleanData.fields.categoryId !== null && cleanData.fields.categoryId.trim() !== '') ? new mongoose.Types.ObjectId(cleanData?.fields?.categoryId) : undefined
+    // }
+    // const { fields } = cleanDataWithUser
+    const data = await link.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: fields }, { new: true })
+    // Cuando se arrastra el link a otra categoría, se ordenan los links de la categoría antigua y de la nueva
+    if (oldCategoryId !== undefined) {
+      await linkModel.sortLinks({ idpanelOrigen: oldCategoryId })
     }
-    const data = await link.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: cleanDataWithUser }, { new: true })
-    if (idpanelOrigen !== undefined) {
-      const idpanelOrigenObjectId = new mongoose.Types.ObjectId(idpanelOrigen)
-      await linkModel.sortLinks({ idpanelOrigen: idpanelOrigenObjectId })
-    }
-    if (idpanelOrigen !== undefined && destinyIds !== undefined && cleanData.categoryId !== undefined) {
-      await linkModel.sortLinks({ idpanelOrigen: new mongoose.Types.ObjectId(cleanData.categoryId), elementos: destinyIds })
+    if (oldCategoryId !== undefined && destinyIds !== undefined && fields?.categoryId !== undefined) {
+      await linkModel.sortLinks({ idpanelOrigen: oldCategoryId, elementos: destinyIds })
     }
     if (data == null) {
       return { error: 'El link no existe' }
@@ -114,7 +125,7 @@ export class linkModel {
       const data = await link.findOneAndDelete({ _id: linkId, user: userObjectId })
       if (data != null) {
         if (data.categoryId != null && data.categoryId.toString().trim() !== '') {
-          await linkModel.sortLinks({ idpanelOrigen: new mongoose.Types.ObjectId(data.categoryId) })
+          await linkModel.sortLinks({ idpanelOrigen: data.categoryId.toString() }) // Ordenar links que quedan en el panel
         }
         return data
       } else {
@@ -235,11 +246,11 @@ export class linkModel {
     }
   }
 
-  // Elementos son los ids de los elementos hacia o desde el panel al que se mueve el link
-  static async sortLinks ({ idpanelOrigen, elementos }: { idpanelOrigen: mongoose.Types.ObjectId, elementos?: string[] }): Promise<{ message: string } | { error: any }> {
+  // Elementos son los ids de los elementos hacia o desde el panel al que se mueve el link. Si no se especifica, se ordenan todos los links del panel idPanelOrigen, es un drag and drop en la misma categoría
+  static async sortLinks ({ idpanelOrigen, elementos }: { idpanelOrigen: string, elementos?: string[] }): Promise<{ message: string } | { error: any }> {
     let dataToSort
     if (elementos === undefined) {
-      const links = await link.find({ categoryId: idpanelOrigen }).sort({ order: 1 }).select('_id')
+      const links = await link.find({ categoryId: new mongoose.Types.ObjectId(idpanelOrigen) }).sort({ order: 1 }).select('_id')
       const stringIds = links.map(link => link._id.toString())
       dataToSort = stringIds
     } else {

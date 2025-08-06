@@ -77,27 +77,17 @@ export class linksController {
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
-    // const [item] = req.body.data // Esto peta si no es iterable
-    // item.user = user
-    // const validatedLink = validateLink(item)
-    // console.log(validatedLink)
-    // // Crear mensaje de error
-    // if (!validatedLink.success) {
-    //   const errorsMessageArray = validatedLink.error?.errors.map((error) => {
-    //     return error.message
-    //   })
-    //   return res.status(400).json({ status: 'fail', message: errorsMessageArray })
-    // }
-    // const cleanData = validatedLink.data
+
+    // El middleware de validación ya se ha ejecutado
+    const validatedLink = req.body
+
     try {
-      const link = req.body
       const userObjectId = new mongoose.Types.ObjectId(user)
       const cleanData = {
-        ...link,
+        ...validatedLink,
         user: userObjectId,
-        categoryId: (link.categoryId != null) ? new mongoose.Types.ObjectId(link.categoryId) : undefined
+        categoryId: (validatedLink.categoryId != null) ? new mongoose.Types.ObjectId(validatedLink.categoryId) : undefined
       }
-      console.log('🚀 ~ linksController ~ createLink ~ cleanData:', cleanData)
       const data = await linkModel.createLink({ cleanData })
       return res.status(201).json({ status: 'success', link: data })
     } catch (error) {
@@ -111,25 +101,23 @@ export class linksController {
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
-    console.log(req.body)
-    const item = req.body.fields
-    const { idpanelOrigen, destinyIds } = req.body
-    console.log('🚀 ~ file: linksController.js:77 ~ linksController ~ updateLink ~ idpanelOrigen:', idpanelOrigen)
-    item.user = user
-    console.log(req.body.idpanelOrigen)
-    // const validatedLink = validatePartialLink(item)
-    // console.log(validatedLink)
-    const id = req.body.id
-    // if (!validatedLink.success) {
-    //   const errorsMessageArray = validatedLink.error?.errors.map((error) => {
-    //     return error.message
-    //   })
-    //   return res.status(400).json({ status: 'fail', message: errorsMessageArray })
-    // }
-    // const cleanData = validatedLink.data
-    const cleanData = item
+
+    // El middleware de validación ya se ha ejecutado
+    // const cleanData = req.body
+    // const { id } = req.params
+    // const { idpanelOrigen, destinyIds } = req.query
+    // DestinyIds se usa para ordenar los links en la categoría destino
+    const { id, idpanelOrigen, destinyIds, fields } = req.body
+    console.log('LinkController', req.body)
+
     try {
-      const link = await linkModel.updateLink({ id, user, idpanelOrigen, cleanData, destinyIds })
+      const link = await linkModel.updateLink({
+        id,
+        user,
+        oldCategoryId: typeof idpanelOrigen === 'string' ? idpanelOrigen : undefined,
+        fields,
+        destinyIds: typeof destinyIds === 'string' ? JSON.parse(destinyIds) : undefined
+      })
       return res.status(200).json({ status: 'success', link })
     } catch (error) {
       return res.status(500).send(error)
@@ -137,7 +125,6 @@ export class linksController {
   }
 
   static async deleteLink (req: RequestWithUser, res: Response): Promise<Response> {
-    console.log(req.body.linkId)
     try {
       const user = req.user?._id
       if (user === undefined || user === null || user === '') {
@@ -145,10 +132,10 @@ export class linksController {
       }
       const { linkId } = req.body
       const link = await linkModel.deleteLink({ user, linkId })
-      if (link !== null && link !== undefined) {
-        return res.status(200).send({ status: 'success', link })
+      if (link !== null && 'error' in link) {
+        return res.status(404).send({ status: 'fail', message: 'El link no existe' })
       }
-      return res.status(404).send({ status: 'fail', message: 'El link no existe' })
+      return res.status(200).json({ status: 'success', link })
     } catch (error) {
       return res.status(500).send(error)
     }

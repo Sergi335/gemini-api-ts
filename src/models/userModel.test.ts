@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import users from './schemas/userSchema'
 import { userModel } from './userModel'
 
@@ -71,12 +71,11 @@ describe('userModel', () => {
       const mockUser = {
         _id: 'user123',
         email,
-        name: 'Test User',
-        profileImage: 'http://example.com/image.jpg'
+        name: 'Test User'
+        // profileImage is optional and not included in this mock
       }
 
-      // @ts-expect-error - Mock de Mongoose
-      users.findOne.mockResolvedValue(mockUser)
+      vi.mocked(users.findOne).mockResolvedValue(mockUser)
 
       const result = await userModel.getUser({ email })
 
