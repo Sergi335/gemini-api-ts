@@ -1,8 +1,0 @@
-
-
-GET http://localhost:3001/links
-content-type: application/json
-
-{
-    "user": "SergioSR"
-}
