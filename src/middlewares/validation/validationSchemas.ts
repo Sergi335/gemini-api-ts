@@ -82,7 +82,18 @@ export const updateLinkBodySchema = z.object({
     bookmark: z.boolean().optional()
   }).optional(),
   oldCategoryId: z.string().optional(),
-  destinyIds: z.array(z.string()).optional()
+  destinyIds: z.array(z.object({
+    id: z.string().min(1, 'ID de destino requerido'),
+    order: z.number().min(0, 'El orden debe ser un número entero no negativo'),
+    name: z.string().optional(),
+    categoryId: z.string()
+  })).optional(),
+  previousIds: z.array(z.object({
+    id: z.string().min(1, 'ID de destino requerido'),
+    order: z.number().min(0, 'El orden debe ser un número entero no negativo'),
+    name: z.string().optional(),
+    categoryId: z.string()
+  })).optional()
 })
 
 export const deleteLinkBodySchema = z.object({

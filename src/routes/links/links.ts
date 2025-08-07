@@ -24,7 +24,7 @@ linksRouter.get('/getbyid/:id',
 )
 linksRouter.get('/desktop',
   validateQuery(paginationQuerySchema),
-  linksController.getAllLinksByCategory
+  linksController.getLinksByTopCategoryId
 )
 linksRouter.get('/count',
   validateQuery(paginationQuerySchema),

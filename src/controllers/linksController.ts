@@ -35,7 +35,7 @@ export class linksController {
     }
   }
 
-  static async getAllLinksByCategory (req: RequestWithUser, res: Response): Promise<Response> {
+  static async getLinksByTopCategoryId (req: RequestWithUser, res: Response): Promise<Response> {
     console.log(req.user)
     const user = req.user?._id
     if (user === undefined || user === null || user === '') {
@@ -45,7 +45,7 @@ export class linksController {
     console.log(req.query)
     try {
       const topCategory = typeof req.query.category === 'string' ? req.query.category : ''
-      const data = await linkModel.getLinksByTopCategory({ user, topCategory })
+      const data = await linkModel.getLinksByTopCategoryId({ user, id: topCategory })
       return res.status(200).json({ status: 'success', data })
     } catch (error) {
       return res.status(500).send(error)
@@ -107,17 +107,13 @@ export class linksController {
     // const { id } = req.params
     // const { idpanelOrigen, destinyIds } = req.query
     // DestinyIds se usa para ordenar los links en la categoría destino
-    const { id, idpanelOrigen, destinyIds, fields } = req.body
-    console.log('LinkController', req.body)
+    // const { id, idpanelOrigen, destinyIds, fields } = req.body
+    // console.log('LinkController', req.body)
+    const validatedData = { user, ...req.body }
+    console.log('🚀 ~ linksController ~ updateLink ~ validatedData:', validatedData)
 
     try {
-      const link = await linkModel.updateLink({
-        id,
-        user,
-        oldCategoryId: typeof idpanelOrigen === 'string' ? idpanelOrigen : undefined,
-        fields,
-        destinyIds: typeof destinyIds === 'string' ? JSON.parse(destinyIds) : undefined
-      })
+      const link = await linkModel.updateLink({ validatedData })
       return res.status(200).json({ status: 'success', link })
     } catch (error) {
       return res.status(500).send(error)

@@ -2,13 +2,7 @@ import type { DeleteResult } from 'mongodb'
 import mongoose from 'mongoose'
 import link from './schemas/linkSchema'
 
-export interface LinkCleanData {
-  id: string
-  oldCategoryId?: string
-  destinyIds?: string[]
-  fields?: Fields
-}
-interface Fields {
+export interface LinkFields {
   name?: string
   description?: string
   url?: string
@@ -22,22 +16,32 @@ interface Fields {
   readList?: boolean
   order?: number
 }
-interface CreateLinkData {
+export interface ValidatedLinkData extends LinkFields {
+  user?: string
+  id?: string
+  oldCategoryId?: string
+  destinyIds?: Array<{ id: string, order: number, name?: string, categoryId: string }>
+  previousIds?: Array<{ id: string, order: number, name?: string, categoryId: string }>
+  fields?: LinkFields
+  // newCategoryId?: string
+}
+export interface CreateLinkData {
   user: string
   categoryId: string
   name: string
   url: string
+  fields?: LinkFields // Opcional, por si quieres permitir más campos en la creación
 }
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class linkModel {
   // Quitar try catch lanzar errores con throw y gestionar errores en el controlador
-  static async getAllLinks ({ user }: { user: string }): Promise<mongoose.Document[]> {
+  static async getAllLinks ({ user }: ValidatedLinkData): Promise<mongoose.Document[]> {
     const userObjectId = new mongoose.Types.ObjectId(user)
     const data = await link.find({ user: userObjectId }).sort({ order: 1 })
     return data
   }
 
-  static async getLinkById ({ user, id }: { user: string, id: string }): Promise<mongoose.Document | { error: string }> {
+  static async getLinkById ({ user, id }: ValidatedLinkData): Promise<mongoose.Document | { error: string }> {
     const userObjectId = new mongoose.Types.ObjectId(user)
     const data = await link.findOne({ user: userObjectId, _id: id })
     if (data != null) {
@@ -47,9 +51,10 @@ export class linkModel {
     }
   }
 
-  static async getLinksByTopCategory ({ user, topCategory }: { user: string, topCategory: string }): Promise<mongoose.Document[] | { error: string }> {
+  static async getLinksByTopCategoryId ({ user, id }: ValidatedLinkData): Promise<mongoose.Document[] | { error: string }> {
     const userObjectId = new mongoose.Types.ObjectId(user)
-    const data = await link.find({ user: userObjectId, topCategory })
+    const categoryObjectId = new mongoose.Types.ObjectId(id)
+    const data = await link.find({ user: userObjectId, categoryId: categoryObjectId })
     if (data.length > 0) {
       return data
     } else {
@@ -57,7 +62,7 @@ export class linkModel {
     }
   }
 
-  static async getLinksCount ({ user, categoryId }: { user: string, categoryId?: string }): Promise<number | { error: string }> {
+  static async getLinksCount ({ user, categoryId }: ValidatedLinkData): Promise<number | { error: string }> {
     const userObjectId = new mongoose.Types.ObjectId(user)
     let data
     if (typeof categoryId === 'string' && categoryId.trim() !== '') {
@@ -81,26 +86,22 @@ export class linkModel {
     return data
   }
 
-  static async updateLink ({ id, user, oldCategoryId, fields, destinyIds }: { id: string, user: string, oldCategoryId?: string, fields?: Fields, destinyIds?: [] }): Promise<mongoose.Document | { error: string }> {
+  static async updateLink ({ validatedData }: { validatedData: ValidatedLinkData }): Promise<mongoose.Document | { error: string }> {
+    const { user, id, destinyIds, fields, previousIds } = validatedData
     const userObjectId = new mongoose.Types.ObjectId(user)
-    // const cleanDataWithUser = {
-    //   ...cleanData,
-    //   user: userObjectId,
-    //   categoryId: (cleanData.fields?.categoryId !== undefined && cleanData.fields.categoryId !== null && cleanData.fields.categoryId.trim() !== '') ? new mongoose.Types.ObjectId(cleanData?.fields?.categoryId) : undefined
-    // }
-    // const { fields } = cleanDataWithUser
-    const data = await link.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: fields }, { new: true })
+
+    const updatedLink = await link.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: fields }, { new: true })
     // Cuando se arrastra el link a otra categoría, se ordenan los links de la categoría antigua y de la nueva
-    if (oldCategoryId !== undefined) {
-      await linkModel.sortLinks({ idpanelOrigen: oldCategoryId })
+    if (previousIds !== undefined) {
+      await linkModel.sortLinks({ previousIds })
     }
-    if (oldCategoryId !== undefined && destinyIds !== undefined && fields?.categoryId !== undefined) {
-      await linkModel.sortLinks({ idpanelOrigen: oldCategoryId, elementos: destinyIds })
+    if (destinyIds !== undefined) {
+      await linkModel.sortLinks({ destinyIds })
     }
-    if (data == null) {
+    if (updatedLink == null) {
       return { error: 'El link no existe' }
     }
-    return data // la data puede ser un error
+    return updatedLink
   }
 
   static async bulkMoveLinks ({ user, source, destiny, panel, links, escritorio }: { user: string, source: string, destiny: string, panel: string, links: string[], escritorio?: string }): Promise<mongoose.UpdateWriteOpResult | { error: string }> {
@@ -125,7 +126,7 @@ export class linkModel {
       const data = await link.findOneAndDelete({ _id: linkId, user: userObjectId })
       if (data != null) {
         if (data.categoryId != null && data.categoryId.toString().trim() !== '') {
-          await linkModel.sortLinks({ idpanelOrigen: data.categoryId.toString() }) // Ordenar links que quedan en el panel
+          // await linkModel.sortLinks({ oldCategoryId: data.categoryId.toString() }) // Ordenar links que quedan en el panel
         }
         return data
       } else {
@@ -247,34 +248,35 @@ export class linkModel {
   }
 
   // Elementos son los ids de los elementos hacia o desde el panel al que se mueve el link. Si no se especifica, se ordenan todos los links del panel idPanelOrigen, es un drag and drop en la misma categoría
-  static async sortLinks ({ idpanelOrigen, elementos }: { idpanelOrigen: string, elementos?: string[] }): Promise<{ message: string } | { error: any }> {
-    let dataToSort
-    if (elementos === undefined) {
-      const links = await link.find({ categoryId: new mongoose.Types.ObjectId(idpanelOrigen) }).sort({ order: 1 }).select('_id')
-      const stringIds = links.map(link => link._id.toString())
-      dataToSort = stringIds
-    } else {
-      dataToSort = elementos
+  static async sortLinks ({ destinyIds, previousIds }: ValidatedLinkData): Promise<{ message: string } | { error: any }> {
+    if (previousIds === undefined && destinyIds === undefined) {
+      return { error: 'No hay elementos para ordenar' }
     }
     try {
-      // Creamos un mapa para almacenar el orden actual de los elementos
-      const ordenActual = new Map()
-      let orden = 0
-      dataToSort.forEach((elemento) => {
-        ordenActual.set(elemento, orden)
-        orden++
-      })
-      console.log(ordenActual)
-      // Actualizamos el campo "orden" de cada elemento en la base de datos
-      const updates = dataToSort.map(async (elemento) => {
-        const orden = ordenActual.get(elemento)
-        await link.findOneAndUpdate(
-          { _id: elemento, categoryId: idpanelOrigen },
-          { order: orden },
-          { new: true }
-        )
-      })
-      await Promise.all(updates)
+      if (destinyIds !== undefined) {
+        // Actualizamos el campo "orden" de cada elemento en la base de datos
+        const updates = destinyIds.map(async (element) => {
+          const order = element.order
+          await link.findOneAndUpdate(
+            { _id: new mongoose.Types.ObjectId(element.id), categoryId: new mongoose.Types.ObjectId(element.categoryId) },
+            { order },
+            { new: true }
+          )
+        })
+        await Promise.all(updates)
+      }
+      if (previousIds !== undefined) {
+        // Actualizamos el campo "orden" de cada elemento en la base de datos
+        const updates = previousIds.map(async (element) => {
+          const order = element.order
+          await link.findOneAndUpdate(
+            { _id: new mongoose.Types.ObjectId(element.id), categoryId: new mongoose.Types.ObjectId(element.categoryId) },
+            { order },
+            { new: true }
+          )
+        })
+        await Promise.all(updates)
+      }
       return { message: 'success' }
     } catch (error) {
       return { error }

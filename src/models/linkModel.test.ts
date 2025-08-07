@@ -1,7 +1,7 @@
 import { Types } from 'mongoose'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CreateLinkData } from '../types/linkModel.types'
-import { linkModel } from './linkModel'
+import { linkModel, ValidatedLinkData } from './linkModel'
 import link from './schemas/linkSchema'
 
 vi.mock('./schemas/linkSchema', () => ({
@@ -64,14 +64,14 @@ describe('linkModel', () => {
     it('devuelve links si existen en la categoría', async () => {
       const mockLinks = [{ _id: mockLinkId, name: 'Link 1' }]
       vi.mocked(link.find).mockResolvedValue(mockLinks as any)
-      const result = await linkModel.getLinksByTopCategory({ user: mockUserId, topCategory: 'test-category' })
+      const result = await linkModel.getLinksByTopCategoryId({ user: mockUserId, categoryId: 'test-category' })
       expect(link.find).toHaveBeenCalledWith({ user: mockUserObjectId, topCategory: 'test-category' })
       expect(result).toEqual(mockLinks)
     })
 
     it('devuelve error si no hay links en la categoría', async () => {
       vi.mocked(link.find).mockResolvedValue([])
-      const result = await linkModel.getLinksByTopCategory({ user: mockUserId, topCategory: 'test-category' })
+      const result = await linkModel.getLinksByTopCategoryId({ user: mockUserId, categoryId: 'test-category' })
       expect(result).toEqual({ error: 'El link no existe' })
     })
   })
@@ -107,9 +107,9 @@ describe('linkModel', () => {
 
   describe('updateLink', () => {
     it('actualiza un link correctamente', async () => {
-      const mockUpdatedLink = { _id: mockLinkId, name: 'Updated Link' }
+      const mockUpdatedLink: ValidatedLinkData = { id: mockLinkId, user: mockUserId, fields: { name: 'Updated Link' } }
       vi.mocked(link.findOneAndUpdate).mockResolvedValue(mockUpdatedLink as any)
-      const result = await linkModel.updateLink({ id: mockLinkId, user: mockUserId, fields: { name: 'Updated Link' } })
+      const result = await linkModel.updateLink({ validatedData: mockUpdatedLink })
       expect(link.findOneAndUpdate).toHaveBeenCalledWith(
         { _id: mockLinkId, user: mockUserObjectId }, // el modelo convierte el string a ObjectId
         { $set: { name: 'Updated Link' } },
@@ -118,12 +118,12 @@ describe('linkModel', () => {
       expect(result).toEqual(mockUpdatedLink)
     })
 
-    it('ejecuta sortLinks cuando se especifica idpanelOrigen', async () => {
-      const mockUpdatedLink = { _id: mockLinkId, name: 'Updated Link' }
+    it('ejecuta sortLinks cuando se especifica oldCategoryId', async () => {
+      const mockUpdatedLink: ValidatedLinkData = { id: mockLinkId, user: mockUserId, oldCategoryId: mockCategoryId, fields: { name: 'Updated Link' } }
       vi.mocked(link.findOneAndUpdate).mockResolvedValue(mockUpdatedLink as any)
       const sortLinksSpy = vi.spyOn(linkModel, 'sortLinks').mockResolvedValue({ message: 'sorted' })
-      await linkModel.updateLink({ id: mockLinkId, user: mockUserId, oldCategoryId: mockCategoryId, fields: { name: 'Updated Link' } })
-      expect(sortLinksSpy).toHaveBeenCalledWith({ idpanelOrigen: mockCategoryObjectId })
+      await linkModel.updateLink({ validatedData: mockUpdatedLink })
+      expect(sortLinksSpy).toHaveBeenCalledWith({ oldCategoryId: mockCategoryObjectId })
       sortLinksSpy.mockRestore()
     })
   })
@@ -176,7 +176,7 @@ describe('linkModel', () => {
       const result = await linkModel.deleteLink({ user: mockUserId, linkId: mockLinkId })
 
       expect(link.findOneAndDelete).toHaveBeenCalledWith({ _id: mockLinkId, user: mockUserObjectId })
-      expect(sortLinksSpy).toHaveBeenCalledWith({ idpanelOrigen: mockCategoryObjectId })
+      expect(sortLinksSpy).toHaveBeenCalledWith({ oldCategoryId: mockCategoryObjectId })
       expect(result).toEqual(mockDeletedLink)
       sortLinksSpy.mockRestore()
     })
@@ -251,7 +251,7 @@ describe('linkModel', () => {
       } as any)
       vi.mocked(link.bulkWrite).mockResolvedValue({ isOk: () => true } as any)
 
-      const result = await linkModel.sortLinks({ idpanelOrigen: mockCategoryObjectId.toString() })
+      const result = await linkModel.sortLinks({ oldCategoryId: mockCategoryObjectId.toString() })
 
       expect(link.find).toHaveBeenCalledWith({ categoryId: mockCategoryObjectId })
       expect(link.bulkWrite).toHaveBeenCalled()
@@ -261,7 +261,7 @@ describe('linkModel', () => {
     it('ordena links con elementos especificados', async () => {
       const elementos = [new Types.ObjectId().toHexString(), new Types.ObjectId().toHexString()]
       vi.mocked(link.bulkWrite).mockResolvedValue({ isOk: () => true } as any)
-      const result = await linkModel.sortLinks({ idpanelOrigen: mockCategoryObjectId.toString(), elementos })
+      const result = await linkModel.sortLinks({ oldCategoryId: mockCategoryObjectId.toString(), elementos })
       expect(link.find).not.toHaveBeenCalled()
       expect(link.bulkWrite).toHaveBeenCalled()
       expect(result).toEqual({ message: 'Links sorted successfully' })
