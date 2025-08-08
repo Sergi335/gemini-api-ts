@@ -97,7 +97,10 @@ export const updateLinkBodySchema = z.object({
 })
 
 export const deleteLinkBodySchema = z.object({
-  linkId: z.string().min(1, 'ID de link requerido')
+  linkId: z.union([
+    z.string().min(1, 'ID de link requerido'),
+    z.array(z.string().min(1, 'ID de link requerido')).min(1, 'Debe proporcionar al menos un link')
+  ])
 })
 
 // Auth schemas

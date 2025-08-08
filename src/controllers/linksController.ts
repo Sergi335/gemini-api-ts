@@ -46,6 +46,9 @@ export class linksController {
     try {
       const topCategory = typeof req.query.category === 'string' ? req.query.category : ''
       const data = await linkModel.getLinksByTopCategoryId({ user, id: topCategory })
+      if (!Array.isArray(data) && typeof data === 'object' && 'error' in data) {
+        return res.status(404).json({ status: 'fail', message: 'Categoría no encontrada' })
+      }
       return res.status(200).json({ status: 'success', data })
     } catch (error) {
       return res.status(500).send(error)
@@ -142,9 +145,9 @@ export class linksController {
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
     }
-    const { source, destiny, panel, links, escritorio } = req.body
+    const { destinationCategoryId, links, previousCategoryId } = req.body
     try {
-      const link = await linkModel.bulkMoveLinks({ user, source, destiny, panel, links, escritorio })
+      const link = await linkModel.bulkMoveLinks({ user, destinationCategoryId, previousCategoryId, links })
       return res.status(200).send({ status: 'success', link })
     } catch (error) {
       return res.status(500).send(error)

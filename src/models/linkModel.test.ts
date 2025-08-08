@@ -1,7 +1,7 @@
 import { Types } from 'mongoose'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CreateLinkData } from '../types/linkModel.types'
-import { linkModel, ValidatedLinkData } from './linkModel'
+import { linkModel } from './linkModel'
 import link from './schemas/linkSchema'
 
 vi.mock('./schemas/linkSchema', () => ({
@@ -64,14 +64,16 @@ describe('linkModel', () => {
     it('devuelve links si existen en la categoría', async () => {
       const mockLinks = [{ _id: mockLinkId, name: 'Link 1' }]
       vi.mocked(link.find).mockResolvedValue(mockLinks as any)
-      const result = await linkModel.getLinksByTopCategoryId({ user: mockUserId, categoryId: 'test-category' })
-      expect(link.find).toHaveBeenCalledWith({ user: mockUserObjectId, topCategory: 'test-category' })
+      // Corregido: usa 'id' en lugar de 'categoryId'
+      const result = await linkModel.getLinksByTopCategoryId({ user: mockUserId, id: mockCategoryId })
+      // Corregido: la consulta usa categoryId, no topCategory
+      expect(link.find).toHaveBeenCalledWith({ user: mockUserObjectId, categoryId: mockCategoryObjectId })
       expect(result).toEqual(mockLinks)
     })
 
     it('devuelve error si no hay links en la categoría', async () => {
       vi.mocked(link.find).mockResolvedValue([])
-      const result = await linkModel.getLinksByTopCategoryId({ user: mockUserId, categoryId: 'test-category' })
+      const result = await linkModel.getLinksByTopCategoryId({ user: mockUserId, id: mockCategoryId })
       expect(result).toEqual({ error: 'El link no existe' })
     })
   })
@@ -107,23 +109,37 @@ describe('linkModel', () => {
 
   describe('updateLink', () => {
     it('actualiza un link correctamente', async () => {
-      const mockUpdatedLink: ValidatedLinkData = { id: mockLinkId, user: mockUserId, fields: { name: 'Updated Link' } }
+      const mockUpdatedLink = { _id: mockLinkId, name: 'Updated Link' }
       vi.mocked(link.findOneAndUpdate).mockResolvedValue(mockUpdatedLink as any)
-      const result = await linkModel.updateLink({ validatedData: mockUpdatedLink })
+      const result = await linkModel.updateLink({
+        validatedData: { id: mockLinkId, user: mockUserId, fields: { name: 'Updated Link' } }
+      })
       expect(link.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: mockLinkId, user: mockUserObjectId }, // el modelo convierte el string a ObjectId
+        { _id: mockLinkId, user: mockUserObjectId },
         { $set: { name: 'Updated Link' } },
         { new: true }
       )
       expect(result).toEqual(mockUpdatedLink)
     })
 
-    it('ejecuta sortLinks cuando se especifica oldCategoryId', async () => {
-      const mockUpdatedLink: ValidatedLinkData = { id: mockLinkId, user: mockUserId, oldCategoryId: mockCategoryId, fields: { name: 'Updated Link' } }
+    it('ejecuta sortLinks cuando se especifica previousIds', async () => {
+      const mockUpdatedLink = { _id: mockLinkId, name: 'Updated Link' }
+      const previousIds = [
+        { id: mockLinkId, order: 0, categoryId: mockCategoryId }
+      ]
       vi.mocked(link.findOneAndUpdate).mockResolvedValue(mockUpdatedLink as any)
-      const sortLinksSpy = vi.spyOn(linkModel, 'sortLinks').mockResolvedValue({ message: 'sorted' })
-      await linkModel.updateLink({ validatedData: mockUpdatedLink })
-      expect(sortLinksSpy).toHaveBeenCalledWith({ oldCategoryId: mockCategoryObjectId })
+      const sortLinksSpy = vi.spyOn(linkModel, 'sortLinks').mockResolvedValue({ message: 'success' })
+
+      await linkModel.updateLink({
+        validatedData: {
+          id: mockLinkId,
+          user: mockUserId,
+          previousIds,
+          fields: { name: 'Updated Link' }
+        }
+      })
+
+      expect(sortLinksSpy).toHaveBeenCalledWith({ previousIds })
       sortLinksSpy.mockRestore()
     })
   })
@@ -131,29 +147,57 @@ describe('linkModel', () => {
   describe('bulkMoveLinks', () => {
     it('mueve múltiples links correctamente', async () => {
       const mockResult = { modifiedCount: 2 } as any
-      vi.mocked(link.updateMany).mockResolvedValue(mockResult)
+      // Mock para countDocuments
+      vi.mocked(link.countDocuments).mockResolvedValue(0)
+      // Mock para bulkWrite
+      vi.mocked(link.bulkWrite).mockResolvedValue(mockResult)
+
+      // Mock para la reordenación de links restantes - debe devolver una cadena de métodos
+      vi.mocked(link.find).mockReturnValue({
+        sort: vi.fn().mockReturnValue({
+          select: vi.fn().mockResolvedValue([])
+        })
+      } as any)
+
       const linksToMove = [new Types.ObjectId().toHexString(), new Types.ObjectId().toHexString()]
       const result = await linkModel.bulkMoveLinks({
         user: mockUserId,
-        source: mockCategoryId,
-        destiny: new Types.ObjectId().toHexString(),
-        panel: 'Test Panel',
+        destinationCategoryId: mockCategoryId,
+        previousCategoryId: mockCategoryId,
         links: linksToMove
       })
-      expect(link.updateMany).toHaveBeenCalled()
+
+      expect(link.countDocuments).toHaveBeenCalledWith({
+        user: mockUserObjectId,
+        categoryId: mockCategoryObjectId
+      })
+      expect(link.bulkWrite).toHaveBeenCalled()
       expect(result).toEqual(mockResult)
+    })
+
+    it('devuelve error si no se proporcionaron enlaces para mover', async () => {
+      // No hacer mock de nada porque la función debe detectar el array vacío antes de usar la BD
+      const result = await linkModel.bulkMoveLinks({
+        user: mockUserId,
+        destinationCategoryId: mockCategoryId,
+        links: [] // Array vacío
+      })
+
+      expect(result).toEqual({ error: 'No se proporcionaron enlaces para mover' })
     })
 
     it('devuelve error si no se movieron enlaces', async () => {
       const mockResult = { modifiedCount: 0 } as any
-      vi.mocked(link.updateMany).mockResolvedValue(mockResult)
+      vi.mocked(link.countDocuments).mockResolvedValue(0)
+      vi.mocked(link.bulkWrite).mockResolvedValue(mockResult)
+
+      const linksToMove = [new Types.ObjectId().toHexString()]
       const result = await linkModel.bulkMoveLinks({
         user: mockUserId,
-        source: mockCategoryId,
-        destiny: new Types.ObjectId().toHexString(),
-        panel: 'Test Panel',
-        links: []
+        destinationCategoryId: mockCategoryId,
+        links: linksToMove
       })
+
       expect(result).toEqual({ error: 'No se movieron enlaces' })
     })
   })
@@ -161,33 +205,67 @@ describe('linkModel', () => {
   describe('deleteLink', () => {
     it('elimina múltiples links cuando se pasa un array', async () => {
       const mockResult = { deletedCount: 2 } as any
-      vi.mocked(link.deleteMany).mockResolvedValue(mockResult)
       const linkIds = [new Types.ObjectId().toHexString(), new Types.ObjectId().toHexString()]
+
+      // Crear mocks separados para diferentes llamadas a link.find
+      const findCallCount = { count: 0 }
+
+      vi.mocked(link.find).mockImplementation((query: any) => {
+        findCallCount.count++
+
+        if (findCallCount.count === 1) {
+          // Primera llamada: buscar links antes de eliminar
+          return {
+            select: vi.fn().mockResolvedValue([
+              { categoryId: mockCategoryObjectId },
+              { categoryId: mockCategoryObjectId }
+            ])
+          } as any
+        } else {
+          // Siguientes llamadas: buscar links restantes para reordenar
+          return {
+            sort: vi.fn().mockReturnValue({
+              select: vi.fn().mockResolvedValue([])
+            })
+          } as any
+        }
+      })
+
+      vi.mocked(link.deleteMany).mockResolvedValue(mockResult)
+      vi.mocked(link.bulkWrite).mockResolvedValue({} as any)
+
       const result = await linkModel.deleteLink({ user: mockUserId, linkId: linkIds })
+
       expect(link.deleteMany).toHaveBeenCalledWith({ _id: { $in: linkIds }, user: mockUserObjectId })
       expect(result).toEqual(mockResult)
     })
 
-    it('elimina un link individual y ejecuta sortLinks', async () => {
-      const mockDeletedLink = { _id: mockLinkId, categoryId: mockCategoryObjectId.toHexString() }
+    it('elimina un link individual', async () => {
+      const mockDeletedLink = { _id: mockLinkId, categoryId: mockCategoryObjectId }
       vi.mocked(link.findOneAndDelete).mockResolvedValue(mockDeletedLink as any)
-      const sortLinksSpy = vi.spyOn(linkModel, 'sortLinks').mockResolvedValue({ message: 'sorted' })
+
+      // Mock para reordenación - links restantes
+      vi.mocked(link.find).mockReturnValue({
+        sort: vi.fn().mockReturnValue({
+          select: vi.fn().mockResolvedValue([])
+        })
+      } as any)
+
+      vi.mocked(link.bulkWrite).mockResolvedValue({} as any)
 
       const result = await linkModel.deleteLink({ user: mockUserId, linkId: mockLinkId })
 
       expect(link.findOneAndDelete).toHaveBeenCalledWith({ _id: mockLinkId, user: mockUserObjectId })
-      expect(sortLinksSpy).toHaveBeenCalledWith({ oldCategoryId: mockCategoryObjectId })
       expect(result).toEqual(mockDeletedLink)
-      sortLinksSpy.mockRestore()
     })
   })
 
   describe('findDuplicateLinks', () => {
     it('encuentra links duplicados por URL', async () => {
       const mockDuplicates = [{ _id: 'http://a.com', count: 2 }]
-      const mockFoundLinks = [[{ url: 'http://a.com' }]]
+      const mockFoundLinks = [{ url: 'http://a.com' }]
       vi.mocked(link.aggregate).mockResolvedValue(mockDuplicates as any)
-      vi.mocked(link.find).mockResolvedValue(mockFoundLinks[0] as any)
+      vi.mocked(link.find).mockResolvedValue(mockFoundLinks as any)
 
       const result = await linkModel.findDuplicateLinks({ user: mockUserId })
 
@@ -196,75 +274,89 @@ describe('linkModel', () => {
         { $group: { _id: '$url', count: { $sum: 1 } } },
         { $match: { count: { $gt: 1 } } }
       ])
-      expect(result).toEqual(mockFoundLinks[0])
-    })
-  })
-
-  describe('searchLinks', () => {
-    it('busca links por nombre, url y notas', async () => {
-      const mockLinks = [{ name: 'Test' }]
-      vi.mocked(link.find).mockResolvedValue(mockLinks as any)
-      const result = await linkModel.searchLinks({ user: mockUserId, query: 'test' })
-      expect(link.find).toHaveBeenCalledWith({
-        $or: [
-          { name: 'test', user: mockUserObjectId },
-          { url: 'test', user: mockUserObjectId },
-          { notes: 'test', user: mockUserObjectId }
-        ]
-      })
-      expect(result).toEqual(mockLinks)
-    })
-  })
-
-  describe('setBookMarksOrder', () => {
-    it('actualiza el orden de bookmarks correctamente', async () => {
-      vi.mocked(link.bulkWrite).mockResolvedValue({} as any)
-      const links: Array<[string, number]> = [[mockLinkId, 1], [new Types.ObjectId().toHexString(), 0]]
-      const result = await linkModel.setBookMarksOrder({ user: mockUserId, links })
-
-      const expectedUpdateOps = links.map(([linkId, order]) => ({
-        updateOne: {
-          filter: { _id: new Types.ObjectId(linkId), user: mockUserObjectId },
-          update: { $set: { bookmarkOrder: order } }
-        }
-      }))
-
-      expect(link.bulkWrite).toHaveBeenCalledWith(expectedUpdateOps)
-      expect(result).toEqual(links.map(([id, order]) => ({ id, order })))
-    })
-
-    it('lanza error cuando bulkWrite falla', async () => {
-      const error = new Error('BulkWrite failed')
-      vi.mocked(link.bulkWrite).mockRejectedValue(error)
-      const links: Array<[string, number]> = [[mockLinkId, 1]]
-      await expect(linkModel.setBookMarksOrder({ user: mockUserId, links })).rejects.toThrow(error)
+      expect(result).toEqual(mockFoundLinks)
     })
   })
 
   describe('sortLinks', () => {
     it('ordena links cuando no se especifican elementos', async () => {
-      const mockLinks = [{ _id: new Types.ObjectId() }, { _id: new Types.ObjectId() }]
-      vi.mocked(link.find).mockReturnValue({
-        sort: vi.fn().mockReturnValue({
-          select: vi.fn().mockResolvedValue(mockLinks)
-        })
-      } as any)
-      vi.mocked(link.bulkWrite).mockResolvedValue({ isOk: () => true } as any)
+      // No hay elementos para ordenar cuando no se pasan ni destinyIds ni previousIds
+      const result = await linkModel.sortLinks({})
 
-      const result = await linkModel.sortLinks({ oldCategoryId: mockCategoryObjectId.toString() })
-
-      expect(link.find).toHaveBeenCalledWith({ categoryId: mockCategoryObjectId })
-      expect(link.bulkWrite).toHaveBeenCalled()
-      expect(result).toEqual({ message: 'Links sorted successfully' })
+      expect(result).toEqual({ error: 'No hay elementos para ordenar' })
     })
 
-    it('ordena links con elementos especificados', async () => {
-      const elementos = [new Types.ObjectId().toHexString(), new Types.ObjectId().toHexString()]
-      vi.mocked(link.bulkWrite).mockResolvedValue({ isOk: () => true } as any)
-      const result = await linkModel.sortLinks({ oldCategoryId: mockCategoryObjectId.toString(), elementos })
-      expect(link.find).not.toHaveBeenCalled()
-      expect(link.bulkWrite).toHaveBeenCalled()
-      expect(result).toEqual({ message: 'Links sorted successfully' })
+    it('ordena links con destinyIds especificados', async () => {
+      const destinyIds = [
+        { id: new Types.ObjectId().toHexString(), order: 0, categoryId: mockCategoryId },
+        { id: new Types.ObjectId().toHexString(), order: 1, categoryId: mockCategoryId }
+      ]
+
+      // Mock para findOneAndUpdate que se llama para cada elemento
+      vi.mocked(link.findOneAndUpdate).mockResolvedValue({} as any)
+
+      const result = await linkModel.sortLinks({ destinyIds })
+
+      // Verificar que se llamó findOneAndUpdate para cada elemento
+      expect(link.findOneAndUpdate).toHaveBeenCalledTimes(destinyIds.length)
+
+      // Verificar las llamadas específicas
+      expect(link.findOneAndUpdate).toHaveBeenCalledWith(
+        {
+          _id: new Types.ObjectId(destinyIds[0].id),
+          categoryId: new Types.ObjectId(destinyIds[0].categoryId)
+        },
+        { order: destinyIds[0].order },
+        { new: true }
+      )
+
+      expect(result).toEqual({ message: 'success' })
+    })
+
+    it('ordena links con previousIds especificados', async () => {
+      const previousIds = [
+        { id: new Types.ObjectId().toHexString(), order: 0, categoryId: mockCategoryId },
+        { id: new Types.ObjectId().toHexString(), order: 1, categoryId: mockCategoryId }
+      ]
+
+      // Mock para findOneAndUpdate que se llama para cada elemento
+      vi.mocked(link.findOneAndUpdate).mockResolvedValue({} as any)
+
+      const result = await linkModel.sortLinks({ previousIds })
+
+      // Verificar que se llamó findOneAndUpdate para cada elemento
+      expect(link.findOneAndUpdate).toHaveBeenCalledTimes(previousIds.length)
+
+      // Verificar las llamadas específicas
+      expect(link.findOneAndUpdate).toHaveBeenCalledWith(
+        {
+          _id: new Types.ObjectId(previousIds[0].id),
+          categoryId: new Types.ObjectId(previousIds[0].categoryId)
+        },
+        { order: previousIds[0].order },
+        { new: true }
+      )
+
+      expect(result).toEqual({ message: 'success' })
+    })
+
+    it('ordena links con ambos destinyIds y previousIds especificados', async () => {
+      const destinyIds = [
+        { id: new Types.ObjectId().toHexString(), order: 0, categoryId: mockCategoryId }
+      ]
+      const previousIds = [
+        { id: new Types.ObjectId().toHexString(), order: 1, categoryId: mockCategoryId }
+      ]
+
+      // Mock para findOneAndUpdate que se llama para cada elemento
+      vi.mocked(link.findOneAndUpdate).mockResolvedValue({} as any)
+
+      const result = await linkModel.sortLinks({ destinyIds, previousIds })
+
+      // Verificar que se llamó findOneAndUpdate para ambos arrays
+      expect(link.findOneAndUpdate).toHaveBeenCalledTimes(destinyIds.length + previousIds.length)
+
+      expect(result).toEqual({ message: 'success' })
     })
   })
 })

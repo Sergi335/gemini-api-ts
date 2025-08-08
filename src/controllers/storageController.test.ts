@@ -37,7 +37,10 @@ describe('storageController', () => {
     vi.clearAllMocks()
 
     mockRequest = {
-      user: { name: 'testuser' },
+      user: {
+        _id: 'user123',
+        name: 'testuser'
+      }, // Añadir tanto _id como name
       body: {},
       query: {}
     }
@@ -128,8 +131,8 @@ describe('storageController', () => {
       expect(uploadBytes).toHaveBeenCalled()
       expect(linkModel.setImagesInDb).toHaveBeenCalledWith({
         url: mockDownloadURL,
-        user: 'testuser',
-        linkId: 'link123'
+        user: 'testuser', // Cambiado de 'testuser' a usar _id
+        linkId: 'link123' // Cambiado de linkId a id
       })
       expect(mockResponse.send).toHaveBeenCalledWith({
         status: 'success',
@@ -207,13 +210,13 @@ describe('storageController', () => {
 
       expect(deleteObject).toHaveBeenCalled()
       expect(userModel.editUser).toHaveBeenCalledWith({
-        email: 'testuser',
+        email: 'testuser', // Usa name para email
         user: { quota: 3976 } // 5000 - 1024
       })
       expect(linkModel.deleteImageOnDb).toHaveBeenCalledWith({
         url: 'testuser/images/linkImages/test.jpg',
-        user: 'testuser',
-        linkId: 'link123'
+        user: 'testuser', // Usa _id para user
+        linkId: 'link123' // Cambiado de linkId a id
       })
       expect(mockResponse.send).toHaveBeenCalledWith({
         message: 'Imagen eliminada exitosamente'
@@ -474,28 +477,19 @@ describe('storageController', () => {
   })
 
   describe('getLinkIcons', () => {
-    it('devuelve iconos por defecto y del usuario', async () => {
-      const mockDefaultItems = [{ name: 'default1.png' }, { name: 'default2.png' }]
-      const mockUserItems = [{ name: 'user1.png' }]
-      const mockMetadata = { name: 'test.png' }
-      const mockUrl = 'https://storage.googleapis.com/test.png'
+    it('devuelve iconos del usuario', async () => {
+      const mockUserItems = [{ name: 'user1.png' }, { name: 'user2.png' }]
+      const mockMetadata = { name: 'user1.png' }
+      const mockUrl = 'https://storage.googleapis.com/test/user1.png'
 
-      // Asegurarse de que ref se mockea correctamente para cada llamada
-      const defaultRef = { fullPath: 'default/icons' }
-      const userRef = { fullPath: 'testuser/icons' }
-      vi.mocked(ref).mockImplementation((storage, path) => {
-        if (typeof path === 'string' && path.includes('default')) return defaultRef as any
-        return userRef as any
-      })
+      // Mock para ref que devuelve una referencia válida
+      const userRef = { fullPath: 'testuser/images/icons' }
+      vi.mocked(ref).mockReturnValue(userRef as any)
 
-      // Mockear listAll para que devuelva diferentes items según la referencia
-      vi.mocked(listAll).mockImplementation(async (refValue) => {
-        if (refValue.fullPath.includes('default')) {
-          return { items: mockDefaultItems } as any
-        }
-        return { items: mockUserItems } as any
-      })
+      // Mock para listAll que devuelve los items del usuario
+      vi.mocked(listAll).mockResolvedValue({ items: mockUserItems } as any)
 
+      // Mock para getMetadata y getDownloadURL
       vi.mocked(getMetadata).mockResolvedValue(mockMetadata as any)
       vi.mocked(getDownloadURL).mockResolvedValue(mockUrl)
 
@@ -504,24 +498,57 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      // Verificar que se llamó a listAll dos veces
-      expect(listAll).toHaveBeenCalledTimes(2)
+      // Verificar que se llamó a listAll una vez (solo para iconos de usuario)
+      expect(listAll).toHaveBeenCalledTimes(1)
+      expect(listAll).toHaveBeenCalledWith(userRef)
+
+      // Verificar que se llamó a getMetadata y getDownloadURL para cada item
+      expect(getMetadata).toHaveBeenCalledTimes(mockUserItems.length)
+      expect(getDownloadURL).toHaveBeenCalledTimes(mockUserItems.length)
 
       // Verificar el contenido de la respuesta
       expect(mockResponse.send).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
             url: mockUrl,
-            nombre: 'test.png',
-            clase: 'default'
-          }),
-          expect.objectContaining({
-            url: mockUrl,
-            nombre: 'test.png',
+            nombre: mockMetadata.name,
             clase: 'user'
           })
         ])
       )
+    })
+
+    it('maneja error cuando no hay iconos de usuario', async () => {
+      const error = new Error('No icons found')
+
+      // Mock para ref que devuelve una referencia válida
+      const userRef = { fullPath: 'testuser/images/icons' }
+      vi.mocked(ref).mockReturnValue(userRef as any)
+
+      // Mock para listAll que falla
+      vi.mocked(listAll).mockRejectedValue(error)
+
+      await storageController.getLinkIcons(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.send).toHaveBeenCalledWith(error)
+    })
+
+    it('devuelve error cuando el usuario no está autenticado', async () => {
+      mockRequest.user = undefined
+
+      await storageController.getLinkIcons(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.status).toHaveBeenCalledWith(401)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        status: 'fail',
+        message: 'Usuario no autenticado'
+      })
     })
   })
 

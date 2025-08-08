@@ -51,9 +51,10 @@ linksRouter.patch('/',
 )
 linksRouter.patch('/move',
   validateBody(z.object({
-    sourceCategoryId: z.string().min(1),
-    destinyCategoryId: z.string().min(1),
-    links: z.array(z.string())
+    destinationCategoryId: z.string().min(1),
+    links: z.array(z.string()),
+    previousCategoryId: z.string().min(1)
+    // el previousCategoryId es para ordenar el viejo
   })),
   linksController.bulkMoveLinks
 )
