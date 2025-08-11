@@ -352,7 +352,7 @@ export class linkModel {
   }
 
   // Elementos son los ids de los elementos hacia o desde el panel al que se mueve el link. Si no se especifica, se ordenan todos los links del panel idPanelOrigen, es un drag and drop en la misma categoría
-  static async sortLinks ({ destinyIds, previousIds }: ValidatedLinkData): Promise<{ message: string } | { error: any }> {
+  static async sortLinks ({ user, destinyIds, previousIds }: ValidatedLinkData): Promise<{ message: string } | { error: any }> {
     if (previousIds === undefined && destinyIds === undefined) {
       return { error: 'No hay elementos para ordenar' }
     }
@@ -362,7 +362,7 @@ export class linkModel {
         const updates = destinyIds.map(async (element) => {
           const order = element.order
           await link.findOneAndUpdate(
-            { _id: new mongoose.Types.ObjectId(element.id), categoryId: new mongoose.Types.ObjectId(element.categoryId) },
+            { _id: new mongoose.Types.ObjectId(element.id), categoryId: new mongoose.Types.ObjectId(element.categoryId), user },
             { order },
             { new: true }
           )
@@ -374,7 +374,7 @@ export class linkModel {
         const updates = previousIds.map(async (element) => {
           const order = element.order
           await link.findOneAndUpdate(
-            { _id: new mongoose.Types.ObjectId(element.id), categoryId: new mongoose.Types.ObjectId(element.categoryId) },
+            { _id: new mongoose.Types.ObjectId(element.id), categoryId: new mongoose.Types.ObjectId(element.categoryId), user },
             { order },
             { new: true }
           )

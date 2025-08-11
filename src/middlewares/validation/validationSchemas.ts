@@ -11,41 +11,33 @@ export const createCategoryBodySchema = z.object({
 })
 
 export const updateCategoryBodySchema = z.object({
-  fields: z.object({
-    name: z.string().min(1).optional(),
-    parentId: z.string().optional(),
-    order: z.number().int().min(0).optional(),
-    hidden: z.boolean().optional(),
-    displayName: z.string().optional(),
-    parentSlug: z.string().optional() // Nuevo campo para slug
-  }),
-  id: z.string().min(1, 'ID de categoría requerido'),
-  columnsIds: z.array(z.string()).optional()
+  updates: z.array(z.object({
+    id: z.string().min(1, 'ID de categoría requerido'),
+    oldParentId: z.string().optional(),
+    fields: z.object({
+      name: z.string().min(1).optional(),
+      parentId: z.string().nullable().optional(),
+      order: z.number().int().min(0).optional(),
+      hidden: z.boolean().optional(),
+      displayName: z.string().optional(),
+      parentSlug: z.string().nullable().optional(),
+      isEmpty: z.boolean().optional(),
+      level: z.number().min(0).optional()
+    }).partial()
+  }))
 })
 
 export const deleteCategoryBodySchema = z.object({
   id: z.string().min(1, 'ID de categoría requerido')
 })
 
-// Nesting categories schema
-export const nestingCategoriesBodySchema = z.object({
-  updates: z.array(
-    z.object({
-      itemId: z.string().min(1, 'ItemId es requerido'),
-      newOrder: z.number().int().min(0, 'newOrder debe ser un número entero no negativo'),
-      newLevel: z.number().int().min(0, 'newLevel debe ser un número entero no negativo'),
-      parentId: z.string().nullable().optional()
-    })
-  ).min(1, 'Debe proporcionar al menos una categoría para actualizar')
-})
-
 // Reordering categories schema
 export const reorderingCategoriesBodySchema = z.object({
   updates: z.array(
     z.object({
-      itemId: z.string().min(1, 'ItemId es requerido'),
-      newOrder: z.number().int().min(0, 'newOrder debe ser un número entero no negativo'),
-      newLevel: z.number().int().min(0, 'newLevel debe ser un número entero no negativo'),
+      id: z.string().min(1, 'ItemId es requerido'),
+      order: z.number().int().min(0, 'order debe ser un número entero no negativo'),
+      level: z.number().int().min(0, 'level debe ser un número entero no negativo'),
       parentId: z.string().nullable().optional(),
       parentSlug: z.string().optional() // Nuevo campo para slug
     })

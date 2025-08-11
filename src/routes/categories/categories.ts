@@ -3,7 +3,6 @@ import { categoriesController } from '../../controllers/categoriesController'
 import {
   createCategoryBodySchema,
   deleteCategoryBodySchema,
-  nestingCategoriesBodySchema,
   reorderingCategoriesBodySchema,
   updateCategoryBodySchema
 } from '../../middlewares/validation/validationSchemas'
@@ -21,10 +20,7 @@ categoriesRouter.post('/',
   validateBody(createCategoryBodySchema),
   categoriesController.createCategory
 )
-categoriesRouter.post('/nest',
-  validateBody(nestingCategoriesBodySchema),
-  categoriesController.updateNestingCategories
-)
+
 categoriesRouter.post('/reorder',
   validateBody(reorderingCategoriesBodySchema),
   categoriesController.updateReorderingCategories
