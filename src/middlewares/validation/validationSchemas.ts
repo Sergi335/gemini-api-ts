@@ -5,9 +5,7 @@ export const createCategoryBodySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   parentId: z.string().optional(),
   order: z.number().int().min(0).optional(),
-  hidden: z.boolean().optional(),
-  displayName: z.string().optional(),
-  user: z.string().optional() // Se añade en el controlador
+  level: z.number().int().min(0).optional()
 })
 
 export const updateCategoryBodySchema = z.object({
@@ -28,20 +26,8 @@ export const updateCategoryBodySchema = z.object({
 })
 
 export const deleteCategoryBodySchema = z.object({
-  id: z.string().min(1, 'ID de categoría requerido')
-})
-
-// Reordering categories schema
-export const reorderingCategoriesBodySchema = z.object({
-  updates: z.array(
-    z.object({
-      id: z.string().min(1, 'ItemId es requerido'),
-      order: z.number().int().min(0, 'order debe ser un número entero no negativo'),
-      level: z.number().int().min(0, 'level debe ser un número entero no negativo'),
-      parentId: z.string().nullable().optional(),
-      parentSlug: z.string().optional() // Nuevo campo para slug
-    })
-  ).min(1, 'Debe proporcionar al menos una categoría para reordenar')
+  id: z.string().min(1, 'ID de categoría requerido'),
+  level: z.number().int().min(0).optional()
 })
 
 // Params schemas

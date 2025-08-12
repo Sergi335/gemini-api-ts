@@ -3,7 +3,6 @@ import { categoriesController } from '../../controllers/categoriesController'
 import {
   createCategoryBodySchema,
   deleteCategoryBodySchema,
-  reorderingCategoriesBodySchema,
   updateCategoryBodySchema
 } from '../../middlewares/validation/validationSchemas'
 import { validateBody } from '../../middlewares/validation/zodValidator'
@@ -19,11 +18,6 @@ categoriesRouter.get('/:slug', categoriesController.getCategoriesByParentSlug)
 categoriesRouter.post('/',
   validateBody(createCategoryBodySchema),
   categoriesController.createCategory
-)
-
-categoriesRouter.post('/reorder',
-  validateBody(reorderingCategoriesBodySchema),
-  categoriesController.updateReorderingCategories
 )
 
 categoriesRouter.patch('/',
