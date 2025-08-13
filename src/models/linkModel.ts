@@ -16,13 +16,13 @@ export interface LinkFields {
   readList?: boolean
   order?: number
   linkId?: string | string[]
+  id?: string
 }
 export interface ValidatedLinkData extends LinkFields {
   user?: string
-  id?: string
   oldCategoryId?: string
-  destinyIds?: Array<{ id: string, order: number, name?: string, categoryId: string }>
-  previousIds?: Array<{ id: string, order: number, name?: string, categoryId: string }>
+  destinyIds?: LinkFields[]
+  previousIds?: LinkFields[]
   fields?: LinkFields
   destinationCategoryId?: string
   previousCategoryId?: string

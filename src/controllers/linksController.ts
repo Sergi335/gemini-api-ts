@@ -2,8 +2,8 @@ import { Response } from 'express'
 import mongoose from 'mongoose'
 import { linkModel } from '../models/linkModel'
 import { RequestWithUser } from '../types/express'
+import { constants } from '../utils/constants'
 import { getLinkNameByUrlLocal, getLinkStatusLocal } from '../utils/linksUtils'
-// import { validatePartialLink } from '../validation/linksZodSchema'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class linksController {
@@ -11,80 +11,87 @@ export class linksController {
     try {
       const user = req.user?._id
       if (user === undefined || user === null || user === '') {
-        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
       }
       const data = await linkModel.getAllLinks({ user })
-      return res.status(200).json({ status: 'success', data })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data })
     } catch (error) {
-      return res.status(500).send(error)
+      console.error('Error in getAllLinks:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
   static async getLinkById (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?._id
-    if (user === undefined || user === null || user === '') {
-      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-    }
-    console.log(req.params)
-    console.log('Entramos en by id')
     try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+      console.log(req.params)
+      console.log('Entramos en by id')
+
       const link = await linkModel.getLinkById({ user, id: req.params.id })
-      return res.status(200).json(link)
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: link })
     } catch (error) {
-      return res.status(500).send(error)
+      console.error('Error in getLinkById:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
   static async getLinksByTopCategoryId (req: RequestWithUser, res: Response): Promise<Response> {
-    console.log(req.user)
-    const user = req.user?._id
-    if (user === undefined || user === null || user === '') {
-      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-    }
-    console.log('Entramos en by desktop')
-    console.log(req.query)
     try {
+      console.log(req.user)
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+      console.log('Entramos en by desktop')
+      console.log(req.query)
+
       const topCategory = typeof req.query.category === 'string' ? req.query.category : ''
       const data = await linkModel.getLinksByTopCategoryId({ user, id: topCategory })
       if (!Array.isArray(data) && typeof data === 'object' && 'error' in data) {
-        return res.status(404).json({ status: 'fail', message: 'Categoría no encontrada' })
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Categoría no encontrada' })
       }
-      return res.status(200).json({ status: 'success', data })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data })
     } catch (error) {
-      return res.status(500).send(error)
+      console.error('Error in getLinksByTopCategoryId:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
   static async getLinksCount (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?._id
-    if (user === undefined || user === null || user === '') {
-      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-    }
     try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+
       console.log(req.query)
 
       const categoryId = typeof req.query.categoryId === 'string' ? req.query.categoryId : undefined
       console.log('🚀 ~ linksController ~ getLinksCount ~ category:', categoryId)
       if (categoryId === undefined || categoryId === '') {
-        return res.status(400).json({ status: 'fail', message: 'Categoría no proporcionada' })
+        return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'categoryId es requerido' })
       }
       const linksCount = await linkModel.getLinksCount({ user, categoryId })
-      return res.status(200).json(linksCount)
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: linksCount })
     } catch (error) {
-      return res.status(500).send(error)
+      console.error('Error in getLinksCount:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
   static async createLink (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?._id
-    if (user === undefined || user === null || user === '') {
-      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-    }
-
-    // El middleware de validación ya se ha ejecutado
-    const validatedLink = req.body
-
     try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+
+      // El middleware de validación ya se ha ejecutado
+      const validatedLink = req.body
+
       const userObjectId = new mongoose.Types.ObjectId(user)
       const cleanData = {
         ...validatedLink,
@@ -92,34 +99,35 @@ export class linksController {
         categoryId: (validatedLink.categoryId != null) ? new mongoose.Types.ObjectId(validatedLink.categoryId) : undefined
       }
       const data = await linkModel.createLink({ cleanData })
-      return res.status(201).json({ status: 'success', link: data })
+      return res.status(201).json({ ...constants.API_SUCCESS_RESPONSE, data })
     } catch (error) {
       console.error('Error en createLink:', error)
-      return res.status(500).send(error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
   static async updateLink (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?._id
-    if (user === undefined || user === null || user === '') {
-      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-    }
-
-    // El middleware de validación ya se ha ejecutado
-    // const cleanData = req.body
-    // const { id } = req.params
-    // const { idpanelOrigen, destinyIds } = req.query
-    // DestinyIds se usa para ordenar los links en la categoría destino
-    // const { id, idpanelOrigen, destinyIds, fields } = req.body
-    // console.log('LinkController', req.body)
-    const validatedData = { user, ...req.body }
-    console.log('🚀 ~ linksController ~ updateLink ~ validatedData:', validatedData)
-
     try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+
+      // El middleware de validación ya se ha ejecutado
+      // const cleanData = req.body
+      // const { id } = req.params
+      // const { idpanelOrigen, destinyIds } = req.query
+      // DestinyIds se usa para ordenar los links en la categoría destino
+      // const { id, idpanelOrigen, destinyIds, fields } = req.body
+      // console.log('LinkController', req.body)
+      const validatedData = { user, ...req.body }
+      console.log('🚀 ~ linksController ~ updateLink ~ validatedData:', validatedData)
+
       const link = await linkModel.updateLink({ validatedData })
-      return res.status(200).json({ status: 'success', link })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: link })
     } catch (error) {
-      return res.status(500).send(error)
+      console.error('Error in updateLink:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
@@ -127,66 +135,94 @@ export class linksController {
     try {
       const user = req.user?._id
       if (user === undefined || user === null || user === '') {
-        return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
       }
       const { linkId } = req.body
       const link = await linkModel.deleteLink({ user, linkId })
       if (link !== null && 'error' in link) {
-        return res.status(404).send({ status: 'fail', message: 'El link no existe' })
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'El link no existe' })
       }
-      return res.status(200).json({ status: 'success', link })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: link })
     } catch (error) {
-      return res.status(500).send(error)
+      console.error('Error in deleteLink:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
   static async bulkMoveLinks (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?._id
-    if (user === undefined || user === null || user === '') {
-      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-    }
-    const { destinationCategoryId, links, previousCategoryId } = req.body
     try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+      const { destinationCategoryId, links, previousCategoryId } = req.body
+
       const link = await linkModel.bulkMoveLinks({ user, destinationCategoryId, previousCategoryId, links })
-      return res.status(200).send({ status: 'success', link })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: link })
     } catch (error) {
-      return res.status(500).send(error)
+      console.error('Error in bulkMoveLinks:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
   static async getLinkNameByUrl (req: RequestWithUser, res: Response): Promise<Response> {
-    const url = typeof req.query.url === 'string' ? req.query.url : ''
-    const data = await getLinkNameByUrlLocal({ url })
-    return res.send(data)
+    try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+      const url = typeof req.query.url === 'string' ? req.query.url : ''
+      const data = await getLinkNameByUrlLocal({ url })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data })
+    } catch (error) {
+      console.error('Error in getLinkNameByUrl:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
+    }
   }
 
   static async getLinkStatus (req: RequestWithUser, res: Response): Promise<Response> {
-    const url = typeof req.query.url === 'string' ? req.query.url : ''
-    const data = await getLinkStatusLocal({ url })
-    return res.send(data)
+    try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+      const url = typeof req.query.url === 'string' ? req.query.url : ''
+      const data = await getLinkStatusLocal({ url })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data })
+    } catch (error) {
+      console.error('Error in getLinkStatus:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
+    }
   }
 
   static async findDuplicateLinks (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?._id
-    if (user === undefined || user === null || user === '') {
-      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+      const data = await linkModel.findDuplicateLinks({ user })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data })
+    } catch (error) {
+      console.error('Error in findDuplicateLinks:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
-    const data = await linkModel.findDuplicateLinks({ user })
-    return res.send(data)
   }
 
   static async setBookMarksOrder (req: RequestWithUser, res: Response): Promise<Response> {
-    const user = req.user?._id
-    if (user === undefined || user === null || user === '') {
-      return res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-    }
-    const { links } = req.body
-    console.log('🚀 ~ linksController ~ setBookMarksOrder ~ links:', links)
     try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+      const { links } = req.body
+      console.log('🚀 ~ linksController ~ setBookMarksOrder ~ links:', links)
+
       const data = await linkModel.setBookMarksOrder({ user, links })
-      return res.status(200).send({ status: 'success', data })
+      return res.status(200).send({ ...constants.API_SUCCESS_RESPONSE, data })
     } catch (error) {
-      return res.status(500).send(error)
+      console.error('Error in setBookMarksOrder:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 }

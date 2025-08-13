@@ -21,10 +21,8 @@ export interface CategoryFields {
 }
 export interface ValidatedCategoryData extends CategoryFields {
   user: string
-  updates?: CategoryFields[]
   fields?: CategoryFields
-  elements?: Array<{ id: string, order: number, name?: string, parentId?: string }>
-  oldParentId?: string
+  elements?: CategoryFields[]
 }
 export interface NewValidatedCategoryData extends CategoryFields {
   updates: ValidatedCategoryData[]
@@ -32,7 +30,7 @@ export interface NewValidatedCategoryData extends CategoryFields {
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class categoryModel {
-  static async getAllCategories ({ user }: { user: string }): Promise<mongoose.Document[] | CategoryErrorResponse> {
+  static async getAllCategories ({ user }: ValidatedCategoryData): Promise<mongoose.Document[] | CategoryErrorResponse> {
     const objectIdUser = new mongoose.Types.ObjectId(user)
     const data = await category.find({ user: objectIdUser }).sort({ order: 1 })
 
@@ -43,13 +41,13 @@ export class categoryModel {
     }
   }
 
-  static async getTopLevelCategories ({ user }: { user: string }): Promise<mongoose.Document[]> {
+  static async getTopLevelCategories ({ user }: ValidatedCategoryData): Promise<mongoose.Document[]> {
     const objectIdUser = new mongoose.Types.ObjectId(user)
     const data = await category.find({ user: objectIdUser, level: 0 }).sort({ order: 1 })
     return data
   }
 
-  static async getCategoriesByParentSlug ({ user, parentSlug }: { user: string, parentSlug: string }): Promise<mongoose.Document[] | CategoryErrorResponse> {
+  static async getCategoriesByParentSlug ({ user, parentSlug }: ValidatedCategoryData): Promise<mongoose.Document[] | CategoryErrorResponse> {
     const objectIdUser = new mongoose.Types.ObjectId(user)
     const data = await category.find({ user: objectIdUser, parentSlug }).sort({ order: 1 })
     if (data.length > 0) {
@@ -59,7 +57,7 @@ export class categoryModel {
     }
   }
 
-  static async getCategoryCount ({ user }: { user: string }): Promise<number | CategoryErrorResponse> {
+  static async getCategoryCount ({ user }: ValidatedCategoryData): Promise<number | CategoryErrorResponse> {
     const objectIdUser = new mongoose.Types.ObjectId(user)
     const data = await category.find({ user: objectIdUser }).countDocuments()
     if (data > 0) {
@@ -69,15 +67,13 @@ export class categoryModel {
     }
   }
 
-  static async createCategory (
-    { user, cleanData }: { user: string, cleanData: CategoryFields }
-  ): Promise<mongoose.Document[]> {
-    if (cleanData.name == null || cleanData.name.trim() === '') {
+  static async createCategory ({ user, fields }: ValidatedCategoryData): Promise<mongoose.Document[]> {
+    if (fields?.name == null || fields?.name.trim() === '') {
       throw new Error('Category name is required to generate a slug')
     }
     const objectIdUser = new mongoose.Types.ObjectId(user)
-    const slug = await this.generateUniqueSlug({ user: objectIdUser, name: cleanData.name })
-    const data = await category.create({ user: objectIdUser, ...cleanData, slug })
+    const slug = await this.generateUniqueSlug({ user, name: fields.name })
+    const data = await category.create({ user: objectIdUser, ...fields, slug })
     return [data]
   }
 
@@ -89,7 +85,7 @@ export class categoryModel {
         const userObjectId = new mongoose.Types.ObjectId(user)
         const objectId = new mongoose.Types.ObjectId(id)
         if (fields?.name !== undefined) {
-          const slug = await this.generateUniqueSlug({ user: userObjectId, name: fields.name })
+          const slug = await this.generateUniqueSlug({ user, name: fields.name })
           fields.slug = slug
         }
         const result = await category.findOneAndUpdate({ _id: objectId, user: userObjectId }, { $set: { ...fields } }, { new: true })
@@ -105,7 +101,7 @@ export class categoryModel {
     }
   }
 
-  static async deleteCategory ({ user, id, level }: { user: string, id: string, level: number }): Promise<mongoose.Document | CategoryErrorResponse | { success: boolean, deletedCount: string }> {
+  static async deleteCategory ({ user, id, level }: ValidatedCategoryData): Promise<mongoose.Document | CategoryErrorResponse | { success: boolean, deletedCount: string }> {
     const userObjectId = new mongoose.Types.ObjectId(user)
     const categoryObjectId = new mongoose.Types.ObjectId(id)
     try {
@@ -150,7 +146,10 @@ export class categoryModel {
     }
   }
 
-  static async generateUniqueSlug ({ user, name }: { user: mongoose.Types.ObjectId, name: string }): Promise<string> {
+  static async generateUniqueSlug ({ user, name }: ValidatedCategoryData): Promise<string> {
+    if (name == null || name.trim() === '') {
+      throw new Error('Category name is required to generate a slug')
+    }
     let slug = this.slugify(name)
     const baseSlug = slug
     let counter = 0

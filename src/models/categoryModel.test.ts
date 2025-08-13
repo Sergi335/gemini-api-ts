@@ -39,7 +39,7 @@ describe('categoryModel', () => {
       vi.mocked(category.find).mockReturnValue({
         sort: vi.fn().mockResolvedValue(mockData)
       } as any)
-      const result = await categoryModel.getAllCategories({ userId: mockUserId })
+      const result = await categoryModel.getAllCategories({ user: mockUserId })
       expect(category.find).toHaveBeenCalledWith({ user: mockUserObjectId })
       expect(result).toEqual(mockData)
     })
@@ -48,7 +48,7 @@ describe('categoryModel', () => {
       vi.mocked(category.find).mockReturnValue({
         sort: vi.fn().mockResolvedValue([])
       } as any)
-      const result = await categoryModel.getAllCategories({ userId: mockUserId })
+      const result = await categoryModel.getAllCategories({ user: mockUserId })
       expect(result).toEqual({ error: 'No se encontraron categorías' })
     })
   })
@@ -59,14 +59,14 @@ describe('categoryModel', () => {
       vi.mocked(category.find).mockReturnValue({
         sort: vi.fn().mockResolvedValue(mockData)
       } as any)
-      const result = await categoryModel.getCategoriesByParentSlug({ userId: mockUserId, parentSlug: 'parent1' })
+      const result = await categoryModel.getCategoriesByParentSlug({ user: mockUserId, parentSlug: 'parent1' })
       expect(category.find).toHaveBeenCalledWith({ user: mockUserObjectId, parentSlug: 'parent1' })
       expect(result).toEqual(mockData)
     })
 
     it('devuelve error si no existen categorías para el parent', async () => {
       vi.mocked(category.find).mockReturnValue({ sort: vi.fn().mockResolvedValue([]) } as any)
-      const result = await categoryModel.getCategoriesByParentSlug({ userId: mockUserId, parentSlug: 'parentX' })
+      const result = await categoryModel.getCategoriesByParentSlug({ user: mockUserId, parentSlug: 'parentX' })
       expect(result).toEqual({ error: 'La category no existe' })
     })
   })
@@ -76,7 +76,7 @@ describe('categoryModel', () => {
       vi.mocked(category.find).mockReturnValue({
         countDocuments: vi.fn().mockResolvedValue(3)
       } as any)
-      const result = await categoryModel.getCategoryCount({ userId: mockUserId })
+      const result = await categoryModel.getCategoryCount({ user: mockUserId })
       expect(category.find).toHaveBeenCalledWith({ user: mockUserObjectId })
       expect(result).toBe(3)
     })
@@ -85,7 +85,7 @@ describe('categoryModel', () => {
       vi.mocked(category.find).mockReturnValue({
         countDocuments: vi.fn().mockResolvedValue(0)
       } as any)
-      const result = await categoryModel.getCategoryCount({ userId: mockUserId })
+      const result = await categoryModel.getCategoryCount({ user: mockUserId })
       expect(result).toEqual({ error: 'No se encuentran columnas para este usuario' })
     })
   })
@@ -97,12 +97,12 @@ describe('categoryModel', () => {
       const mockCreated = { _id: mockCategoryId, user: mockUserId, ...mockCategory, slug: mockSlug }
       vi.spyOn(categoryModel, 'generateUniqueSlug').mockResolvedValue(mockSlug)
       vi.mocked(category.create).mockResolvedValue(mockCreated as any)
-      const result = await categoryModel.createCategory({ userId: mockUserId, cleanData: mockCategory })
+      const result = await categoryModel.createCategory({ user: mockUserId, cleanData: mockCategory })
       expect(result).toEqual([mockCreated])
     })
 
     it('lanza error si el nombre está vacío', async () => {
-      await expect(categoryModel.createCategory({ userId: mockUserId, cleanData: { name: '' } })).rejects.toThrow('Category name is required to generate a slug')
+      await expect(categoryModel.createCategory({ user: mockUserId, cleanData: { name: '' } })).rejects.toThrow('Category name is required to generate a slug')
     })
   })
 
@@ -118,9 +118,9 @@ describe('categoryModel', () => {
       vi.mocked(category.findOneAndUpdate).mockResolvedValue(updatedData as any)
       vi.mocked(link.updateMany).mockResolvedValue({} as any)
 
-      const result = await categoryModel.updateCategory({ userId: mockUserId, id: mockCategoryId, cleanData: { name: 'Updated Name' } })
+      const result = await categoryModel.newUpdateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { name: 'Updated Name' } }] })
 
-      expect(categoryModel.generateUniqueSlug).toHaveBeenCalledWith({ userId: mockUserId, name: 'Updated Name' })
+      expect(categoryModel.generateUniqueSlug).toHaveBeenCalledWith({ user: mockUserId, name: 'Updated Name' })
       expect(category.findOneAndUpdate).toHaveBeenCalledWith({ _id: mockCategoryId, user: mockUserObjectId }, { $set: { name: 'Updated Name', slug: 'updated-name' } }, { new: true })
       expect(link.updateMany).toHaveBeenCalledWith({ idpanel: mockCategoryId, user: mockUserObjectId }, { $set: { panel: 'Updated Name' } })
       expect(result).toEqual(updatedData)
@@ -132,7 +132,7 @@ describe('categoryModel', () => {
       vi.mocked(category.findOneAndUpdate).mockResolvedValue(movedData as any)
       vi.mocked(link.updateMany).mockResolvedValue({} as any)
 
-      const result = await categoryModel.updateCategory({ userId: mockUserId, id: mockCategoryId, cleanData: { parentId: mockParentId } })
+      const result = await categoryModel.newUpdateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { parentId: mockParentId, order: 1 } }] })
 
       expect(category.find).toHaveBeenCalledWith({ parentId: mockParentId, user: mockUserObjectId })
       expect(category.findOneAndUpdate).toHaveBeenCalledWith({ _id: mockCategoryId, user: mockUserObjectId }, { $set: { parentId: mockParentId, order: 1 } }, { new: true })
@@ -142,7 +142,7 @@ describe('categoryModel', () => {
 
     it('devuelve un error si la columna a actualizar no se encuentra', async () => {
       vi.mocked(category.findOneAndUpdate).mockResolvedValue(null)
-      const result = await categoryModel.updateCategory({ userId: mockUserId, id: 'nonexistent', cleanData: { name: 'any' } })
+      const result = await categoryModel.newUpdateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { name: 'Nonexistent' } }] })
       expect(result).toEqual({ error: 'La columna no existe' })
     })
   })
@@ -156,12 +156,12 @@ describe('categoryModel', () => {
       vi.mocked(category.find).mockReturnValue({ sort: vi.fn().mockResolvedValue([]) } as any)
       vi.spyOn(categoryModel, 'setColumnsOrder').mockResolvedValue({ error: '' })
 
-      const result = await categoryModel.deleteCategory({ userId: mockUserId, id: mockCategoryId })
+      const result = await categoryModel.deleteCategory({ user: mockUserId, id: mockCategoryId, level: 1 })
 
       expect(category.findOne).toHaveBeenCalledWith({ _id: mockCategoryId, user: mockUserObjectId })
       expect(link.deleteMany).toHaveBeenCalledWith({ idpanel: mockCategoryId, user: mockUserObjectId })
       expect(category.deleteOne).toHaveBeenCalledWith({ _id: mockCategoryId, user: mockUserObjectId })
-      expect(categoryModel.setColumnsOrder).toHaveBeenCalledWith({ userId: mockUserId, elementos: [], parentId: mockParentObjectId })
+      expect(categoryModel.setColumnsOrder).toHaveBeenCalledWith({ user: mockUserId, elementos: [], parentId: mockParentObjectId })
       expect(result).toEqual(columnToDelete)
     })
   })

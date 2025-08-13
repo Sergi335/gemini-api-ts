@@ -12,7 +12,7 @@ const categoriesRouter = Express.Router()
 // Rutas GET - no necesitan validación adicional (checkUserSession ya se aplica en app.ts)
 categoriesRouter.get('/', categoriesController.getAllCategories)
 categoriesRouter.get('/toplevel', categoriesController.getTopLevelCategories)
-categoriesRouter.get('/:slug', categoriesController.getCategoriesByParentSlug)
+// categoriesRouter.get('/:slug', categoriesController.getCategoriesByParentSlug)
 
 // Rutas POST/PATCH/DELETE - solo necesitan validación de body
 categoriesRouter.post('/',
