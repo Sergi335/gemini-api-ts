@@ -1,5 +1,6 @@
 import type { DeleteResult } from 'mongodb'
 import mongoose from 'mongoose'
+import { LinkErrorResponse } from '../types/linkModel.types'
 import link from './schemas/linkSchema'
 
 export interface LinkFields {
@@ -19,14 +20,17 @@ export interface LinkFields {
   id?: string
 }
 export interface ValidatedLinkData extends LinkFields {
+  previousIds?: LinkFields[]
   user?: string
   oldCategoryId?: string
   destinyIds?: LinkFields[]
-  previousIds?: LinkFields[]
   fields?: LinkFields
   destinationCategoryId?: string
   previousCategoryId?: string
   links?: string[]
+}
+export interface NewValidatedLinkData extends ValidatedLinkData {
+  updates: ValidatedLinkData[]
 }
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class linkModel {
@@ -98,6 +102,32 @@ export class linkModel {
       return { error: 'El link no existe' }
     }
     return updatedLink
+  }
+
+  static async newUpdateLink ({ updates }: NewValidatedLinkData): Promise<Array<mongoose.Document | { id: string | undefined, error: string }> | LinkErrorResponse> {
+    if (updates[0].previousIds !== undefined) {
+      await linkModel.sortLinks({ previousIds: updates[0].previousIds })
+    }
+    if (updates[0].destinyIds !== undefined) {
+      await linkModel.sortLinks({ destinyIds: updates[0].destinyIds })
+    }
+    try {
+      const updatedData = []
+      for (const update of updates) {
+        const { user, id, fields } = update
+        const userObjectId = new mongoose.Types.ObjectId(user)
+        const objectId = new mongoose.Types.ObjectId(id)
+        const result = await link.findOneAndUpdate({ _id: objectId, user: userObjectId }, { $set: { ...fields } }, { new: true })
+        if (result === null) {
+          updatedData.push({ id: id ?? undefined, error: 'El link no existe' })
+        } else {
+          updatedData.push(result)
+        }
+      }
+      return updatedData
+    } catch (error) {
+      return { error: (error as Error).message }
+    }
   }
 
   static async bulkMoveLinks ({ user, destinationCategoryId, previousCategoryId, links }: ValidatedLinkData): Promise<import('mongodb').BulkWriteResult | { error: string }> {

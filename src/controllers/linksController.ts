@@ -108,23 +108,21 @@ export class linksController {
 
   static async updateLink (req: RequestWithUser, res: Response): Promise<Response> {
     try {
+      // Usuario ya validado por middleware validateUser
       const user = req.user?._id
       if (user === undefined || user === null || user === '') {
         return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
       }
+      const { updates } = req.body
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'Invalid updates array' })
+      }
+      updates.forEach(update => {
+        update.user = user
+      })
 
-      // El middleware de validación ya se ha ejecutado
-      // const cleanData = req.body
-      // const { id } = req.params
-      // const { idpanelOrigen, destinyIds } = req.query
-      // DestinyIds se usa para ordenar los links en la categoría destino
-      // const { id, idpanelOrigen, destinyIds, fields } = req.body
-      // console.log('LinkController', req.body)
-      const validatedData = { user, ...req.body }
-      console.log('🚀 ~ linksController ~ updateLink ~ validatedData:', validatedData)
-
-      const link = await linkModel.updateLink({ validatedData })
-      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: link })
+      const updatedData = await linkModel.newUpdateLink({ updates })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: updatedData })
     } catch (error) {
       console.error('Error in updateLink:', error)
       return res.status(500).json({ ...constants.API_FAIL_RESPONSE })

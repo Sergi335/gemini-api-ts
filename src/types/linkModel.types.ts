@@ -28,7 +28,7 @@
 
 // Respuesta de error para operaciones de links
 export interface LinkErrorResponse {
-  success: false
+  success?: false
   error: string
   details?: string
 }
