@@ -7,8 +7,13 @@ export const validateRequest = (options: ValidationOptions) => {
     const errors: ValidationError[] = []
 
     try {
-      // Validar body
-      if (options.body != null) {
+      // Validar body solo si existe y no es multipart
+      if (
+        options.body != null &&
+        typeof req.body === 'object' &&
+        req.body !== null &&
+        Object.keys(req.body).length > 0
+      ) {
         const result = options.body.safeParse(req.body)
         if (!result.success) {
           const bodyErrors = result.error.issues.map(issue => ({

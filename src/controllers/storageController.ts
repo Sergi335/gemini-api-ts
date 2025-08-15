@@ -4,106 +4,91 @@ import { firebaseStorage as storage } from '../config/firebase'
 import { linkModel } from '../models/linkModel'
 import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
-
-// const firebaseConfig = {
-//   apiKey: process.env.FB_API_KEY,
-//   authDomain: process.env.FB_AUTH_DOMAIN,
-//   projectId: process.env.FB_PROJECT_ID,
-//   storageBucket: process.env.FB_STORAGE_BUCKET,
-//   messagingSenderId: process.env.FB_MESSAGING_ID,
-//   appId: process.env.FB_APP_ID
-// }
-
-// const app = initializeApp(firebaseConfig)
-// Ensure firebaseApp is initialized and is of type FirebaseApp
-// const storage = firebaseStorage
+import { constants } from '../utils/constants'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class storageController {
-  static async getBackgroundsMiniatures (req: RequestWithUser, res: Response): Promise<void> {
+  static async getBackgroundsMiniatures (req: RequestWithUser, res: Response): Promise<Response> {
     // const user = req.user.name
     try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
       const fileRef = ref(storage, 'miniatures')
       const list = await listAll(fileRef)
       const { items } = list
-      // items.forEach((item) => {
-      //   getMetadata(item).then(metadata => console.log(metadata)).catch(console.error)
-      // })
+      // Añadir función para subir backgrounds y buscar también en la carpeta del usuario
       const backgroundsPromises = items.map(async (back) => ({
         url: await getDownloadURL(back),
         nombre: (await getMetadata(back)).name
       }))
 
       const backgrounds = await Promise.all(backgroundsPromises)
-      res.send({ backgrounds })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: backgrounds })
     } catch (err) {
       console.error('Error al leer la carpeta:', err)
-      res.send(err)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
     }
   }
 
   // Validar?
-  static async uploadImage (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?.name
-    if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      return
-    }
-    const file = req.file
+  static async uploadImage (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
+    const id = req.user?._id
+    console.log('🚀 ~ storageController ~ uploadImage ~ user:', email)
     const linkId = req.body.linkId
-    // Si no hay imagen error
+
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+    }
+
     if (req.file === undefined || req.file === null) {
-      res.send({ error: 'No hemos recibido imagen' })
-      return
+      return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No hemos recibido imagen' })
     }
     try {
       // El lugar donde quieres guardar el archivo
-      const imagesRef = ref(storage, `${user}/images/linkImages`)
+      const file = req.file
+      const imagesRef = ref(storage, `${email}/images/linkImages`)
       const uniqueSuffix = Date.now().toString() + '-' + Math.round(Math.random() * 1E9).toString()
       const extension = typeof file?.originalname === 'string' ? String(file.originalname.split('.').pop() ?? 'jpg') : 'jpg'
 
       // El lugar y el nombre donde se guardará el archivo
       const imageRef = ref(imagesRef, `${uniqueSuffix}.${extension}`)
-      if (file === undefined || file === null) {
-        res.status(400).send({ error: 'No hemos recibido imagen' })
-        return
-      }
       const snapshot = await uploadBytes(imageRef, file.buffer)
       const downloadURL = await getDownloadURL(snapshot.ref)
       try {
-        const resultadoDb = await linkModel.setImagesInDb({ url: downloadURL, user, linkId })
-        res.send({ status: 'success', link: resultadoDb })
+        const resultadoDb = await linkModel.setImagesInDb({ url: downloadURL, user: id, id: linkId })
+        return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: resultadoDb })
       } catch (error) {
-        res.send(error)
+        return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al guardar la imagen en la base de datos' })
       }
     } catch (error) {
       console.error('Error al subir el archivo:', error)
-      res.status(500).send({ error: 'Error al subir el archivo' })
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al subir el archivo' })
     }
   }
   // borrar por nombre -> revisar resto
 
-  static async deleteImage (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?.name
+  static async deleteImage (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
+    const id = req.user?._id
     const linkId = req.body.id
     const imageUrl = req.body.image
 
-    if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      return
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     }
 
     // Validar con zod?
     if (imageUrl === undefined || imageUrl === null || imageUrl === '') {
-      res.send({ error: 'No hemor recibido la imagen en la petición' })
-      return
+      return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No hemos recibido la imagen en la petición' })
     }
     try {
       // Construye la referencia a la imagen en Storage
       const imageRef = ref(storage, imageUrl)
       if (imageRef === null || imageRef === undefined) {
-        res.send({ error: 'No se encontró la imagen para eliminar' })
-        return
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'No se encontró la imagen para eliminar' })
       }
       const { size } = await getMetadata(imageRef)
       console.log('🚀 ~ storageController ~ deleteImage ~ size:', size)
@@ -111,52 +96,51 @@ export class storageController {
       await deleteObject(imageRef)
       try {
         // Restar el tamaño de la imagen al usuario
-        const userResult = await userModel.getUser({ email: user })
+        const userResult = await userModel.getUser({ email })
         if ('error' in userResult) {
-          res.send({ error: 'Usuario no encontrado' })
-          return
+          return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Usuario no encontrado' })
         }
-        const quota = (userResult as any).quota
+        const quota = userResult.quota
+        if (quota === undefined) {
+          console.error('Error: cuota no definida')
+          return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error interno del servidor' })
+        }
         const newQuota = quota - size
         console.log('🚀 ~ storageController ~ deleteImage ~ newQuota:', newQuota)
-        await userModel.editUser({ email: user, user: { quota: newQuota } })
+        await userModel.editUser({ email, fields: { quota: newQuota } })
 
         // Borrar la referencia de la imagen en base de datos
-        await linkModel.deleteImageOnDb({ url: imageUrl, user, linkId })
-        res.send({ message: 'Imagen eliminada exitosamente' }) // Mensaje success, etc. ver en cliente
+        await linkModel.deleteImageOnDb({ url: imageUrl, user: id, id: linkId }) // No borra el registro en la db
+        return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, message: 'Imagen eliminada exitosamente' })
       } catch (error) {
-        res.send({ error })
+        console.error('Error al eliminar la imagen de la base de datos:', error)
+        return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al eliminar la imagen de la base de datos' })
       }
-    } catch (error: unknown) {
-      // console.error('Error al eliminar la imagen:', error)
-      // if (error.code === 'storage/invalid-url' || error.code === 'storage/object-not-found') {
-      //   await linkModel.deleteImageOnDb(imageUrl, user, linkId) // Ojo esto esta por error
-      // }
-      const errorCode = error != null && typeof error === 'object' && 'code' in error ? (error as any).code : 'unknown'
-      res.status(500).send({ error: errorCode })
+    } catch (error) {
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al eliminar la imagen de la base de datos' })
     }
   }
 
-  static async uploadIcon (req: RequestWithUser, res: Response): Promise<void> {
+  static async uploadIcon (req: RequestWithUser, res: Response): Promise<Response> {
     const file = req.file
-    const user = req.user?.name
+    const user = req.user?.email
+    const userId = req.user?._id
     const linkId = req.body.linkId
 
     if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      return
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     }
 
     // Si no hay imagen ha elegido una de muestra
     if (file === undefined || file === null) {
       try {
         const filePath = req.body.filePath
-        const resultadoDb = await linkModel.setLinkImgInDb({ url: filePath, user, linkId })
-        res.send(resultadoDb)
+        const resultadoDb = await linkModel.setLinkImgInDb({ url: filePath, user: userId, id: linkId })
+        return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: resultadoDb })
       } catch (error) {
-        res.send(error)
+        console.error('Error al establecer la imagen en la base de datos:', error)
+        return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al establecer la imagen en la base de datos' })
       }
-      return
     }
     // Limitar tamaño en el cliente validar aqui
     try {
@@ -167,57 +151,59 @@ export class storageController {
       const snapshot = await uploadBytes(imageRef, file.buffer)
       const downloadURL = await getDownloadURL(snapshot.ref)
       try {
-        await linkModel.setLinkImgInDb({ url: downloadURL, user, linkId })
-        res.send({ message: '¡Archivo o blob subido!', url: downloadURL, name: `${uniqueSuffix}.${extension}` })
+        await linkModel.setLinkImgInDb({ url: downloadURL, user: userId, id: linkId })
+        return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: { url: downloadURL, name: `${uniqueSuffix}.${extension}` } })
       } catch (error) {
-        res.send(error)
+        console.error('Error al establecer la imagen en la base de datos:', error)
+        return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al establecer la imagen en la base de datos' })
       }
     } catch (error) {
       console.error('Error al subir el archivo:', error)
-      res.status(500).send({ error: 'Error al subir el archivo' })
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al establecer la imagen en la base de datos' })
     }
   }
 
-  static async deleteIcon (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?.name
-    if (user === undefined || user === null || user === '') {
-      res.status(401).send('Error usuario no proporcionado')
-      return
+  static async deleteIcon (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     }
 
     const imageName = String(req.body.image)
     console.log('🚀 ~ storageController ~ deleteIcon ~ imageUrl:', imageName)
     try {
       // Construye la referencia a la imagen en Storage
-      const imageRef = ref(storage, `${user}/images/icons/${imageName}`)
+      const imageRef = ref(storage, `${email}/images/icons/${imageName}`)
       const { size } = await getMetadata(imageRef)
       console.log('🚀 ~ storageController ~ deleteIcon ~ size:', size)
 
-      const userResult = await userModel.getUser({ email: user })
+      const userResult = await userModel.getUser({ email })
       if ('error' in userResult) {
-        res.send({ error: 'Usuario no encontrado' })
-        return
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Usuario no encontrado' })
       }
-      const quota = (userResult as any).quota
+      const quota = userResult.quota
+      if (quota === undefined) {
+        console.error('Error: cuota no definida')
+        return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error interno del servidor' })
+      }
       const newQuota = quota - size
       console.log('🚀 ~ storageController ~ deleteIcon ~ newQuota:', newQuota)
-      await userModel.editUser({ email: user, user: { quota: newQuota } })
+      await userModel.editUser({ email, fields: { quota: newQuota } })
       // Borra el archivo en firebase
       await deleteObject(imageRef)
-      res.send({ message: 'Imagen eliminada exitosamente' })
-    } catch (error: unknown) {
-      const errorCode = error != null && typeof error === 'object' && 'code' in error ? (error as any).code : 'unknown'
-      res.status(500).send({ error: errorCode })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, message: 'Imagen eliminada exitosamente' })
+    } catch (error) {
+      console.error('Error al eliminar la imagen:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al eliminar la imagen' })
     }
   }
 
-  static async getLinkIcons (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?._id
-    const userName = req.user?.name ?? ''
+  static async getLinkIcons (req: RequestWithUser, res: Response): Promise<Response> {
+    // const user = req.user?._id
+    const email = req.user?.email
 
-    if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      return
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     }
 
     // De la carpeta 'SergioSR/images/icons' tira toda la app
@@ -233,7 +219,7 @@ export class storageController {
       // }))
       // const icons = await Promise.all(defaultIconsPromises)
 
-      const userIconsList = await listAll(ref(storage, `${userName}/images/icons`))
+      const userIconsList = await listAll(ref(storage, `${email}/images/icons`))
       const userIconsPromises = userIconsList.items.map(async (back) => ({
         url: await getDownloadURL(back),
         nombre: (await getMetadata(back)).name,
@@ -242,54 +228,62 @@ export class storageController {
       const userIcons = await Promise.all(userIconsPromises)
       // icons.push(...userIcons)
 
-      res.send(userIcons)
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: userIcons })
     } catch (err) {
       console.error('Error al leer la carpeta:', err)
-      res.send(err)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al leer la carpeta' })
     }
   }
 
-  static async getBackgroundUrl (req: RequestWithUser, res: Response): Promise<void> {
-    // const user = req.user.name
+  static async getBackgroundUrl (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
+
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+    }
     const nombre = String(req.query.nombre ?? '')
     try {
       const fileRef = ref(storage, `/backgrounds/${nombre}`)
       const downloadUrl = await getDownloadURL(fileRef)
       console.log('Me han llamado')
-      res.send(downloadUrl)
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: downloadUrl })
     } catch (error) {
-      res.send(error)
+      console.error('Error al obtener la URL de descarga:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al obtener la URL de descarga' })
     }
   }
 
-  static async getUserBackup (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?.name
+  static async getUserBackup (req: RequestWithUser, res: Response): Promise<Response> {
+    try {
+      const email = req.user?.email
 
-    if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      return
+      if (email === undefined || email === null || email === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+
+      const fileName = `${email}dataBackup.json`
+      const fileRef = ref(storage, `${email}/backups/${fileName}`)
+      const downloadUrl = await getDownloadURL(fileRef)
+      console.log(downloadUrl)
+
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: downloadUrl })
+    } catch (error) {
+      console.error('Error al obtener la copia de seguridad del usuario:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al obtener la copia de seguridad del usuario' })
     }
-
-    const fileName = `${user}dataBackup.json`
-    const fileRef = ref(storage, `${user}/backups/${fileName}`)
-    const downloadUrl = await getDownloadURL(fileRef)
-    console.log(downloadUrl)
-
-    res.send({ downloadUrl })
   }
 
   // TODO: Este método necesita desktopModel y columnModel que no están disponibles
-  static async createUserBackup (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?.name
+  static async createUserBackup (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
 
-    if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      return
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     }
 
     try {
       // Comentado hasta que estén disponibles los modelos necesarios
-      res.status(501).send({ error: 'Funcionalidad no implementada - faltan modelos desktopModel y columnModel' })
+      return res.status(501).send({ error: 'Funcionalidad no implementada - faltan modelos desktopModel y columnModel' })
       /*
       const data1 = await desktopModel.getAllDesktops({ user })
       const data2 = await columnModel.getAllColumns({ user })
@@ -304,7 +298,7 @@ export class storageController {
     } catch (error) {
       const mensaje = 'Error al crear la copia de seguridad'
       console.error('Error al crear la copia de seguridad:', error)
-      res.send({ mensaje })
+      return res.send({ mensaje })
     }
   }
 
@@ -346,16 +340,14 @@ export class storageController {
     }
   }
 
-  static async uploadProfileImage (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?.name
+  static async uploadProfileImage (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
 
-    if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
-      return
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     }
     if (req.file === undefined || req.file === null) {
-      res.status(400).send({ error: 'No se proporcionó ningún archivo' })
-      return
+      return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No se proporcionó ningún archivo' })
     }
 
     const file = req.file
@@ -363,7 +355,7 @@ export class storageController {
     try {
       // Cambiar loop por seleccionar la única que debe haber, el loop puede venir bien al borrar la cuenta de usuario
       // Calcular el tamaño y calcular nueva cuota
-      const imagesRef = ref(storage, `${user}/images/profile`)
+      const imagesRef = ref(storage, `${email}/images/profile`)
       const list = await listAll(imagesRef)
       const { items } = list
       let prevImageSize = 0
@@ -382,40 +374,37 @@ export class storageController {
       const newSize = snapshot.metadata.size
       const diference = Number(newSize) - Number(prevImageSize)
 
-      const userResult = await userModel.getUser({ email: user })
+      const userResult = await userModel.getUser({ email })
       if ('error' in userResult) {
-        res.send({ error: 'Usuario no encontrado' })
-        return
+        return res.json({ ...constants.API_FAIL_RESPONSE, error: 'Usuario no encontrado' })
       }
-      const quota = (userResult as any).quota
+      const quota = userResult.quota
 
       if (quota === undefined) {
         const newQuota = Number(newSize)
         if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
-          res.send({ error: 'No tienes espacio suficiente' })
-          return
+          return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
         }
-        await userModel.editUser({ email: user, user: { quota: newQuota } })
+        await userModel.editUser({ email, fields: { quota: newQuota } })
         console.log('🚀 ~ storageController ~ uploadProfileImage ~ quota:', quota)
       } else {
         const newQuota = Number(quota) + Number(diference)
         if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
-          res.send({ error: 'No tienes espacio suficiente' })
-          return
+          return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
         }
         console.log('🚀 ~ storageController ~ uploadProfileImage ~ newQuota:', newQuota)
-        await userModel.editUser({ email: user, user: { quota: newQuota } })
+        await userModel.editUser({ email, fields: { quota: newQuota } })
       }
       const downloadURL = await getDownloadURL(snapshot.ref)
       try {
-        await userModel.updateProfileImage({ url: downloadURL, user })
-        res.send({ message: '¡Archivo o blob subido!', url: downloadURL })
+        await userModel.updateProfileImage({ profileImage: downloadURL, email })
+        return res.json({ ...constants.API_SUCCESS_RESPONSE, message: '¡Archivo o blob subido!', data: { url: downloadURL } })
       } catch (error) {
-        res.send(error)
+        return res.json({ ...constants.API_FAIL_RESPONSE, error: 'Error al actualizar la imagen de perfil' })
       }
     } catch (error) {
       console.error('Error al subir el archivo:', error)
-      res.status(500).send({ error: 'Error al subir el archivo' })
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al subir el archivo' })
     }
   }
 

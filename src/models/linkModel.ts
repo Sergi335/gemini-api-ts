@@ -86,23 +86,23 @@ export class linkModel {
     return data
   }
 
-  static async updateLink ({ validatedData }: { validatedData: ValidatedLinkData }): Promise<mongoose.Document | { error: string }> {
-    const { user, id, destinyIds, fields, previousIds } = validatedData
-    const userObjectId = new mongoose.Types.ObjectId(user)
+  // static async updateLink ({ validatedData }: { validatedData: ValidatedLinkData }): Promise<mongoose.Document | { error: string }> {
+  //   const { user, id, destinyIds, fields, previousIds } = validatedData
+  //   const userObjectId = new mongoose.Types.ObjectId(user)
 
-    const updatedLink = await link.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: fields }, { new: true })
-    // Cuando se arrastra el link a otra categoría, se ordenan los links de la categoría antigua y de la nueva
-    if (previousIds !== undefined) {
-      await linkModel.sortLinks({ previousIds })
-    }
-    if (destinyIds !== undefined) {
-      await linkModel.sortLinks({ destinyIds })
-    }
-    if (updatedLink == null) {
-      return { error: 'El link no existe' }
-    }
-    return updatedLink
-  }
+  //   const updatedLink = await link.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: fields }, { new: true })
+  //   // Cuando se arrastra el link a otra categoría, se ordenan los links de la categoría antigua y de la nueva
+  //   if (previousIds !== undefined) {
+  //     await linkModel.sortLinks({ previousIds })
+  //   }
+  //   if (destinyIds !== undefined) {
+  //     await linkModel.sortLinks({ destinyIds })
+  //   }
+  //   if (updatedLink == null) {
+  //     return { error: 'El link no existe' }
+  //   }
+  //   return updatedLink
+  // }
 
   static async newUpdateLink ({ updates }: NewValidatedLinkData): Promise<Array<mongoose.Document | { id: string | undefined, error: string }> | LinkErrorResponse> {
     if (updates[0].previousIds !== undefined) {
@@ -130,61 +130,61 @@ export class linkModel {
     }
   }
 
-  static async bulkMoveLinks ({ user, destinationCategoryId, previousCategoryId, links }: ValidatedLinkData): Promise<import('mongodb').BulkWriteResult | { error: string }> {
-    const userObjectId = new mongoose.Types.ObjectId(user)
-    const destinationObjectId = new mongoose.Types.ObjectId(destinationCategoryId)
+  // static async bulkMoveLinks ({ user, destinationCategoryId, previousCategoryId, links }: ValidatedLinkData): Promise<import('mongodb').BulkWriteResult | { error: string }> {
+  //   const userObjectId = new mongoose.Types.ObjectId(user)
+  //   const destinationObjectId = new mongoose.Types.ObjectId(destinationCategoryId)
 
-    // Contar los links existentes en la categoría de destino
-    const existingLinksCount = await link.countDocuments({
-      user: userObjectId,
-      categoryId: destinationObjectId
-    })
+  //   // Contar los links existentes en la categoría de destino
+  //   const existingLinksCount = await link.countDocuments({
+  //     user: userObjectId,
+  //     categoryId: destinationObjectId
+  //   })
 
-    // Mover los links y asignar orden secuencial a partir del conteo actual
-    if (links == null || !Array.isArray(links) || links.length === 0) {
-      return { error: 'No se proporcionaron enlaces para mover' }
-    }
+  //   // Mover los links y asignar orden secuencial a partir del conteo actual
+  //   if (links == null || !Array.isArray(links) || links.length === 0) {
+  //     return { error: 'No se proporcionaron enlaces para mover' }
+  //   }
 
-    const updateOperations = links.map((linkId, index) => ({
-      updateOne: {
-        filter: { _id: new mongoose.Types.ObjectId(linkId), user: userObjectId },
-        update: {
-          $set: {
-            categoryId: destinationObjectId,
-            order: existingLinksCount + index
-          }
-        }
-      }
-    }))
+  //   const updateOperations = links.map((linkId, index) => ({
+  //     updateOne: {
+  //       filter: { _id: new mongoose.Types.ObjectId(linkId), user: userObjectId },
+  //       update: {
+  //         $set: {
+  //           categoryId: destinationObjectId,
+  //           order: existingLinksCount + index
+  //         }
+  //       }
+  //     }
+  //   }))
 
-    const result = await link.bulkWrite(updateOperations)
+  //   const result = await link.bulkWrite(updateOperations)
 
-    if (result.modifiedCount === 0) {
-      return { error: 'No se movieron enlaces' }
-    }
+  //   if (result.modifiedCount === 0) {
+  //     return { error: 'No se movieron enlaces' }
+  //   }
 
-    // Reordenar los links que quedan en la categoría anterior
-    if (typeof previousCategoryId === 'string' && previousCategoryId.trim() !== '') {
-      const previousCategoryObjectId = new mongoose.Types.ObjectId(previousCategoryId)
-      const remainingLinks = await link.find({
-        user: userObjectId,
-        categoryId: previousCategoryObjectId
-      }).sort({ order: 1 }).select('_id')
+  //   // Reordenar los links que quedan en la categoría anterior
+  //   if (typeof previousCategoryId === 'string' && previousCategoryId.trim() !== '') {
+  //     const previousCategoryObjectId = new mongoose.Types.ObjectId(previousCategoryId)
+  //     const remainingLinks = await link.find({
+  //       user: userObjectId,
+  //       categoryId: previousCategoryObjectId
+  //     }).sort({ order: 1 }).select('_id')
 
-      if (remainingLinks.length > 0) {
-        const reorderOperations = remainingLinks.map((linkDoc, index) => ({
-          updateOne: {
-            filter: { _id: linkDoc._id, user: userObjectId },
-            update: { $set: { order: index } }
-          }
-        }))
+  //     if (remainingLinks.length > 0) {
+  //       const reorderOperations = remainingLinks.map((linkDoc, index) => ({
+  //         updateOne: {
+  //           filter: { _id: linkDoc._id, user: userObjectId },
+  //           update: { $set: { order: index } }
+  //         }
+  //       }))
 
-        await link.bulkWrite(reorderOperations)
-      }
-    }
+  //       await link.bulkWrite(reorderOperations)
+  //     }
+  //   }
 
-    return result
-  }
+  //   return result
+  // }
 
   static async deleteLink ({ user, linkId }: ValidatedLinkData): Promise<mongoose.Document | DeleteResult | { error: string }> {
     const userObjectId = new mongoose.Types.ObjectId(user)

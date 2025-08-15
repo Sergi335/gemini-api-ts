@@ -47,32 +47,6 @@ export const createLinkBodySchema = z.object({
   bookmark: z.boolean().optional()
 })
 
-// export const updateLinkBodySchema = z.object({
-//   id: z.string().min(1, 'ID de link requerido'),
-//   fields: z.object({
-//     name: z.string().min(1).optional(),
-//     description: z.string().optional(),
-//     url: z.string().url().optional(),
-//     imgUrl: z.string().url().optional(),
-//     categoryId: z.string().optional(),
-//     order: z.number().int().min(0).optional(),
-//     notes: z.string().optional(),
-//     bookmark: z.boolean().optional()
-//   }).optional(),
-//   oldCategoryId: z.string().optional(),
-//   destinyIds: z.array(z.object({
-//     id: z.string().min(1, 'ID de destino requerido'),
-//     order: z.number().min(0, 'El orden debe ser un número entero no negativo'),
-//     name: z.string().optional(),
-//     categoryId: z.string()
-//   })).optional(),
-//   previousIds: z.array(z.object({
-//     id: z.string().min(1, 'ID de destino requerido'),
-//     order: z.number().min(0, 'El orden debe ser un número entero no negativo'),
-//     name: z.string().optional(),
-//     categoryId: z.string()
-//   })).optional()
-// })
 export const updateLinkBodySchema = z.object({
   updates: z.array(z.object({
     id: z.string().min(1, 'ID de link requerido'),
@@ -131,7 +105,8 @@ export const updateUserBodySchema = z.object({
     email: z.string().email().optional(),
     profileImage: z.string().url().optional(),
     website: z.string().url().optional(),
-    aboutMe: z.string().max(500).optional()
+    aboutMe: z.string().max(500).optional(),
+    realName: z.string().min(2).optional()
   })
 })
 
@@ -150,5 +125,6 @@ export const uploadImageBodySchema = z.object({
 })
 
 export const deleteImageBodySchema = z.object({
-  imageName: z.string().min(1, 'Nombre de imagen requerido')
+  id: z.string().min(1, 'ID de imagen requerido'),
+  image: z.string().min(1, 'URL de imagen requerida')
 })

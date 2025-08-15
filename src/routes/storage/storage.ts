@@ -49,7 +49,7 @@ storageRouter.delete('/image',
 )
 storageRouter.delete('/icon',
   validateBody(z.object({
-    imageName: z.string().min(1, 'Nombre de imagen requerido')
+    image: z.string().min(1, 'Nombre de imagen requerido')
   })),
   storageController.deleteIcon
 )

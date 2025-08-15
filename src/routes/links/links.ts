@@ -49,15 +49,15 @@ linksRouter.patch('/',
   validateBody(updateLinkBodySchema),
   linksController.updateLink
 )
-linksRouter.patch('/move',
-  validateBody(z.object({
-    destinationCategoryId: z.string().min(1),
-    links: z.array(z.string()),
-    previousCategoryId: z.string().min(1)
-    // el previousCategoryId es para ordenar el viejo
-  })),
-  linksController.bulkMoveLinks
-)
+// linksRouter.patch('/move',
+//   validateBody(z.object({
+//     destinationCategoryId: z.string().min(1),
+//     links: z.array(z.string()),
+//     previousCategoryId: z.string().min(1)
+//     // el previousCategoryId es para ordenar el viejo
+//   })),
+//   linksController.bulkMoveLinks
+// )
 linksRouter.patch('/setbookmarksorder',
   validateBody(z.object({
     links: z.array(z.tuple([z.string(), z.number()]))
