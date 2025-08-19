@@ -121,7 +121,7 @@ export class linksController {
         update.user = user
       })
 
-      const updatedData = await linkModel.newUpdateLink({ updates })
+      const updatedData = await linkModel.updateLink({ updates })
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: updatedData })
     } catch (error) {
       console.error('Error in updateLink:', error)

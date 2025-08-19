@@ -71,8 +71,16 @@ describe('userModel', () => {
       const mockUser = {
         _id: 'user123',
         email,
-        name: 'Test User'
-        // profileImage is optional and not included in this mock
+        name: 'Test User',
+        aboutMe: 'About me text',
+        profileImage: 'http://example.com/image.jpg',
+        webSite: '',
+        newUser: false,
+        quota: 0,
+        realName: 'Test User',
+        signMethod: 'email',
+        googleId: 'google-id-123',
+        lastBackupUrl: 'http://example.com/backup'
       }
 
       vi.mocked(users.findOne).mockResolvedValue(mockUser)
@@ -112,7 +120,7 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOneAndUpdate.mockResolvedValue(mockUpdatedUser)
 
-      const result = await userModel.editUser({ email, user: updateData })
+      const result = await userModel.editUser({ email, fields: { ...updateData } })
 
       expect(users.findOneAndUpdate).toHaveBeenCalledWith(
         { email },
@@ -129,7 +137,7 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOneAndUpdate.mockResolvedValue(null)
 
-      const result = await userModel.editUser({ email, user: updateData })
+      const result = await userModel.editUser({ email, fields: { ...updateData } })
 
       expect(users.findOneAndUpdate).toHaveBeenCalledWith(
         { email },
@@ -156,7 +164,7 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOneAndUpdate.mockResolvedValue(mockUpdatedUser)
 
-      const result = await userModel.editUser({ email, user: updateData })
+      const result = await userModel.editUser({ email, fields: { ...updateData } })
 
       expect(result).toEqual(mockUpdatedUser)
     })
@@ -227,7 +235,7 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOneAndUpdate.mockResolvedValue(mockUpdatedUser)
 
-      const result = await userModel.updateProfileImage({ url, user: userEmail })
+      const result = await userModel.updateProfileImage({ profileImage: url, email: userEmail })
 
       expect(users.findOneAndUpdate).toHaveBeenCalledWith(
         { email: userEmail },
@@ -244,7 +252,7 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOneAndUpdate.mockResolvedValue(null)
 
-      const result = await userModel.updateProfileImage({ url, user: userEmail })
+      const result = await userModel.updateProfileImage({ profileImage: url, email: userEmail })
 
       expect(users.findOneAndUpdate).toHaveBeenCalledWith(
         { email: userEmail },
@@ -266,7 +274,7 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOneAndUpdate.mockResolvedValue(mockUpdatedUser)
 
-      const result = await userModel.updateProfileImage({ url, user: userEmail })
+      const result = await userModel.updateProfileImage({ profileImage: url, email: userEmail })
 
       expect(result).toEqual({ error: 'Usuario no encontrado' })
     })
@@ -289,7 +297,7 @@ describe('userModel', () => {
         // @ts-expect-error - Mock de Mongoose
         users.findOneAndUpdate.mockResolvedValue(mockUpdatedUser)
 
-        const result = await userModel.updateProfileImage({ url, user: userEmail })
+        const result = await userModel.updateProfileImage({ profileImage: url, email: userEmail })
 
         expect(result).toEqual({ message: 'Usuario encontrado y actualizado' })
       }
@@ -304,9 +312,10 @@ describe('userModel', () => {
       }
 
       // @ts-expect-error - Mock de Mongoose
-      users.findOne.mockRejectedValue(new Error('Database connection error'))
+      users.findOne.mockRejectedValue(new Error('Error al crear el usuario'))
 
-      await expect(userModel.createUser({ user: userData })).rejects.toThrow('Database connection error')
+      const result = await userModel.createUser({ user: userData })
+      expect(result).toEqual({ error: 'Error al crear el usuario' })
     })
 
     it('maneja errores de conexión en getUser', async () => {
@@ -315,7 +324,8 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOne.mockRejectedValue(new Error('Database connection error'))
 
-      await expect(userModel.getUser({ email })).rejects.toThrow('Database connection error')
+      const result = await userModel.getUser({ email })
+      expect(result).toEqual({ error: 'Error al obtener el usuario' })
     })
 
     it('maneja errores de conexión en editUser', async () => {
@@ -325,7 +335,8 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOneAndUpdate.mockRejectedValue(new Error('Database connection error'))
 
-      await expect(userModel.editUser({ email, user: updateData })).rejects.toThrow('Database connection error')
+      const result = await userModel.editUser({ email, fields: { ...updateData } })
+      expect(result).toEqual({ error: 'Error al editar el usuario' })
     })
 
     it('maneja errores de conexión en deleteUser', async () => {
@@ -334,7 +345,8 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.deleteOne.mockRejectedValue(new Error('Database connection error'))
 
-      await expect(userModel.deleteUser({ email })).rejects.toThrow('Database connection error')
+      const result = await userModel.deleteUser({ email })
+      expect(result).toEqual({ error: 'Error al eliminar el usuario' })
     })
 
     it('maneja errores de conexión en updateProfileImage', async () => {
@@ -344,7 +356,8 @@ describe('userModel', () => {
       // @ts-expect-error - Mock de Mongoose
       users.findOneAndUpdate.mockRejectedValue(new Error('Database connection error'))
 
-      await expect(userModel.updateProfileImage({ url, user: userEmail })).rejects.toThrow('Database connection error')
+      const result = await userModel.updateProfileImage({ profileImage: url, email: userEmail })
+      expect(result).toEqual({ error: 'Error al actualizar la imagen de perfil' })
     })
   })
 })

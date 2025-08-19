@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { linksController } from '../controllers/linksController'
 import { linkModel } from '../models/linkModel'
 import { RequestWithUser } from '../types/express'
+import { constants } from '../utils/constants'
 
 // Mock the dependencies
 vi.mock('../models/linkModel')
@@ -54,7 +55,10 @@ describe('LinksController', () => {
 
     expect(linkModel.getAllLinks).toHaveBeenCalledWith({ user: mockUserId })
     expect(mockRes.status).toHaveBeenCalledWith(200)
-    expect(mockRes.json).toHaveBeenCalledWith({ status: 'success', data: mockLinks })
+    expect(mockRes.json).toHaveBeenCalledWith({
+      ...constants.API_SUCCESS_RESPONSE,
+      data: mockLinks
+    })
   })
 
   test('createLink should create new link when validation passes', async () => {
@@ -109,40 +113,45 @@ describe('LinksController', () => {
     // O, para probar el catch, podemos hacer que el modelo falle.
     const linkData = { name: 'Bad Link' }
     mockReq = createMockReq(linkData)
-    const dbError = new Error('Database error')
+    const dbError = new Error('Operación fallida')
     vi.mocked(linkModel.createLink).mockRejectedValue(dbError)
 
     await linksController.createLink(mockReq, mockRes)
 
     expect(mockRes.status).toHaveBeenCalledWith(500)
-    expect(mockRes.send).toHaveBeenCalledWith(dbError)
+    expect(mockRes.json).toHaveBeenCalledWith({
+      ...constants.API_FAIL_RESPONSE,
+      message: dbError.message
+    })
   })
 
   test('updateLink should update link when validation passes', async () => {
     const updateData = {
-      id: 'link123',
-      fields: { name: 'Updated Link' }
+      updates: [{
+        id: 'link123',
+        fields: { name: 'Updated Link' }
+      }]
     }
     // El controlador espera los datos en req.body, no en params/query separados
     mockReq = createMockReq(updateData)
 
-    const updatedLink = { _id: 'link123', name: 'Updated Link', user: mockUserId }
+    const updatedLink = { updates: [{ id: 'link123', fields: { name: 'Updated Link' }, user: mockUserId }] }
     vi.mocked(linkModel.updateLink).mockResolvedValue(updatedLink as any)
 
     await linksController.updateLink(mockReq, mockRes)
 
     // El controlador llama con validatedData que incluye user
     expect(linkModel.updateLink).toHaveBeenCalledWith({
-      validatedData: {
+      updates: [{
         user: mockUserId,
         id: 'link123',
         fields: { name: 'Updated Link' }
-      }
+      }]
     })
     expect(mockRes.status).toHaveBeenCalledWith(200)
     expect(mockRes.json).toHaveBeenCalledWith({
-      status: 'success',
-      link: updatedLink
+      ...constants.API_SUCCESS_RESPONSE,
+      data: updatedLink
     })
   })
 
@@ -158,8 +167,8 @@ describe('LinksController', () => {
     expect(linkModel.deleteLink).toHaveBeenCalledWith({ user: mockUserId, linkId: 'link123' })
     expect(mockRes.status).toHaveBeenCalledWith(200)
     expect(mockRes.json).toHaveBeenCalledWith({
-      status: 'success',
-      link: deletedLink
+      ...constants.API_SUCCESS_RESPONSE,
+      data: deletedLink
     })
   })
 
@@ -172,9 +181,9 @@ describe('LinksController', () => {
     await linksController.deleteLink(mockReq, mockRes)
 
     expect(mockRes.status).toHaveBeenCalledWith(404)
-    expect(mockRes.send).toHaveBeenCalledWith({
-      status: 'fail',
-      message: 'El link no existe'
+    expect(mockRes.json).toHaveBeenCalledWith({
+      ...constants.API_FAIL_RESPONSE,
+      error: 'El link no existe'
     })
   })
 
@@ -187,6 +196,8 @@ describe('LinksController', () => {
     await linksController.getAllLinks(mockReq, mockRes)
 
     expect(mockRes.status).toHaveBeenCalledWith(500)
-    expect(mockRes.send).toHaveBeenCalledWith(new Error('Database error'))
+    expect(mockRes.json).toHaveBeenCalledWith({
+      ...constants.API_FAIL_RESPONSE
+    })
   })
 })

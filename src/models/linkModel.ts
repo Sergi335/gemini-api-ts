@@ -104,7 +104,7 @@ export class linkModel {
   //   return updatedLink
   // }
 
-  static async newUpdateLink ({ updates }: NewValidatedLinkData): Promise<Array<mongoose.Document | { id: string | undefined, error: string }> | LinkErrorResponse> {
+  static async updateLink ({ updates }: NewValidatedLinkData): Promise<Array<mongoose.Document | { id: string | undefined, error: string }> | LinkErrorResponse> {
     if (updates[0].previousIds !== undefined) {
       await linkModel.sortLinks({ previousIds: updates[0].previousIds })
     }

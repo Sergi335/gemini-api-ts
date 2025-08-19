@@ -1,8 +1,9 @@
 import { Response } from 'express'
-import { Types } from 'mongoose'
+import mongoose, { Types } from 'mongoose'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { categoryModel } from '../models/categoryModel'
 import { RequestWithUser } from '../types/express'
+import { constants } from '../utils/constants'
 import { categoriesController } from './categoriesController'
 
 // Mock del categoryModel
@@ -31,6 +32,130 @@ describe('categoriesController', () => {
     }
   })
 
+  describe('updateCategory - validaciones y errores', () => {
+    it('devuelve 401 si el usuario no está autenticado', async () => {
+      mockRequest.user = undefined
+      mockRequest.body = { updates: [{ id: 'cat123', name: 'Updated Category' }] }
+
+      await categoriesController.updateCategory(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.status).toHaveBeenCalledWith(401)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: constants.API_NOT_USER_MESSAGE
+      })
+    })
+
+    it('devuelve 400 si updates es un array vacío', async () => {
+      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.body = { updates: [] }
+
+      await categoriesController.updateCategory(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Invalid updates array'
+      })
+    })
+
+    it('devuelve 404 si la categoría no existe', async () => {
+      vi.mocked(categoryModel.updateCategory).mockResolvedValueOnce({ error: 'La categoría no existe' })
+      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.body = { updates: [{ id: 'cat999', name: 'No existe' }] }
+
+      await categoriesController.updateCategory(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.status).toHaveBeenCalledWith(200)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: { error: 'La categoría no existe' }
+      })
+    })
+
+    it('devuelve 500 si el modelo lanza una excepción', async () => {
+      vi.mocked(categoryModel.updateCategory).mockRejectedValueOnce(new Error('Error inesperado'))
+      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.body = { updates: [{ id: 'cat123', name: 'Updated Category' }] }
+
+      await categoriesController.updateCategory(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.status).toHaveBeenCalledWith(500)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Error inesperado'
+      })
+    })
+
+    it('devuelve 200 y un array con errores si alguna categoría no existe', async () => {
+      const results = [
+        { id: 'cat999', error: 'La categoría no existe' },
+        { id: 'cat123', name: 'Actualizada' }
+      ] as unknown as Array<mongoose.Document | { id: string | undefined, error: string }>
+      vi.mocked(categoryModel.updateCategory).mockResolvedValueOnce(results)
+      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.body = { updates: [{ id: 'cat999', name: 'No existe' }, { id: 'cat123', name: 'Actualizada' }] }
+
+      await categoriesController.updateCategory(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.status).toHaveBeenCalledWith(200)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: results
+      })
+    })
+  })
+
+  describe('deleteCategory - casos límite y errores', () => {
+    it('devuelve 404 si la categoría a eliminar no existe', async () => {
+      vi.mocked(categoryModel.deleteCategory).mockResolvedValueOnce({ error: 'No existe' })
+      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.body = { id: 'cat999' }
+
+      await categoriesController.deleteCategory(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.status).toHaveBeenCalledWith(404)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Categoría no encontrada'
+      })
+    })
+
+    it('devuelve 401 si el usuario no está autenticado', async () => {
+      mockRequest.user = undefined
+      mockRequest.body = { id: 'cat123' }
+
+      await categoriesController.deleteCategory(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(mockResponse.status).toHaveBeenCalledWith(401)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: constants.API_NOT_USER_MESSAGE
+      })
+    })
+  })
+
   describe('getAllCategories', () => {
     it('devuelve todas las categorías exitosamente', async () => {
       const mockCategories = [
@@ -45,10 +170,10 @@ describe('categoriesController', () => {
         mockResponse as Response
       )
 
-      expect(categoryModel.getAllCategories).toHaveBeenCalledWith({ userId: mockUserId })
+      expect(categoryModel.getAllCategories).toHaveBeenCalledWith({ user: mockUserId })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
       expect(mockResponse.json).toHaveBeenCalledWith({
-        status: 'success',
+        ...constants.API_SUCCESS_RESPONSE,
         data: mockCategories
       })
     })
@@ -63,9 +188,8 @@ describe('categoriesController', () => {
       )
 
       expect(mockResponse.status).toHaveBeenCalledWith(500)
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        status: 'fail',
-        error
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE
       })
     })
   })
@@ -92,13 +216,13 @@ describe('categoriesController', () => {
       )
 
       expect(categoryModel.createCategory).toHaveBeenCalledWith({
-        userId: mockUserId,
-        cleanData: { ...newCategoryData, user: mockUserId }
+        user: mockUserId,
+        fields: { ...newCategoryData }
       })
       expect(mockResponse.status).toHaveBeenCalledWith(201)
       expect(mockResponse.json).toHaveBeenCalledWith({
-        status: 'success',
-        category: [mockCreatedCategory]
+        ...constants.API_SUCCESS_RESPONSE,
+        data: [mockCreatedCategory]
       })
     })
 
@@ -113,9 +237,8 @@ describe('categoriesController', () => {
       )
 
       expect(mockResponse.status).toHaveBeenCalledWith(500)
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        status: 'fail',
-        error
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE
       })
     })
   })
@@ -124,7 +247,7 @@ describe('categoriesController', () => {
     it('actualiza una categoría exitosamente', async () => {
       const updateData = { name: 'Updated Category' }
       // El controlador espera 'fields' y 'id' en el body
-      mockRequest.body = { fields: updateData, id: 'cat123' }
+      mockRequest.body = { updates: [{ ...updateData, id: 'cat123' }] }
 
       const mockUpdatedCategory = {
         _id: 'cat123',
@@ -140,36 +263,20 @@ describe('categoriesController', () => {
       )
 
       expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        userId: mockUserId,
-        id: 'cat123',
-        cleanData: updateData,
-        elements: undefined
+        updates: [
+          {
+            user: mockUserId,
+            id: 'cat123',
+            name: updateData.name,
+            elements: undefined
+          }
+
+        ]
       })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
       expect(mockResponse.json).toHaveBeenCalledWith({
-        status: 'success',
-        column: mockUpdatedCategory
-      })
-    })
-
-    it('actualiza una categoría con elementos de ordenación', async () => {
-      const updateData = { name: 'Updated Category' }
-      // El controlador espera 'fields', 'id' y 'columnsIds' en el body
-      mockRequest.body = { fields: updateData, id: 'cat123', columnsIds: ['col1', 'col2'] }
-
-      const mockUpdatedCategory = { _id: 'cat123', ...updateData, user: mockUserId }
-      vi.mocked(categoryModel.updateCategory).mockResolvedValue(mockUpdatedCategory as any)
-
-      await categoriesController.updateCategory(
-        mockRequest as RequestWithUser,
-        mockResponse as Response
-      )
-
-      expect(categoryModel.updateCategory).toHaveBeenCalledWith({
-        userId: mockUserId,
-        id: 'cat123',
-        cleanData: updateData,
-        elements: ['col1', 'col2']
+        ...constants.API_SUCCESS_RESPONSE,
+        data: mockUpdatedCategory
       })
     })
   })
@@ -194,12 +301,12 @@ describe('categoriesController', () => {
 
       expect(categoryModel.deleteCategory).toHaveBeenCalledWith({
         id: 'cat123',
-        userId: mockUserId
+        user: mockUserId
       })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
       expect(mockResponse.json).toHaveBeenCalledWith({
-        status: 'success',
-        column: mockDeletedCategory
+        ...constants.API_SUCCESS_RESPONSE,
+        data: mockDeletedCategory
       })
     })
   })

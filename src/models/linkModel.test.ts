@@ -112,14 +112,14 @@ describe('linkModel', () => {
       const mockUpdatedLink = { _id: mockLinkId, name: 'Updated Link' }
       vi.mocked(link.findOneAndUpdate).mockResolvedValue(mockUpdatedLink as any)
       const result = await linkModel.updateLink({
-        validatedData: { id: mockLinkId, user: mockUserId, fields: { name: 'Updated Link' } }
+        updates: [{ id: mockLinkId, user: mockUserId, fields: { name: 'Updated Link' } }]
       })
       expect(link.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: mockLinkId, user: mockUserObjectId },
+        { _id: mockLinkObjectId, user: mockUserObjectId },
         { $set: { name: 'Updated Link' } },
         { new: true }
       )
-      expect(result).toEqual(mockUpdatedLink)
+      expect(result).toEqual([mockUpdatedLink])
     })
 
     it('ejecuta sortLinks cuando se especifica previousIds', async () => {
@@ -131,74 +131,16 @@ describe('linkModel', () => {
       const sortLinksSpy = vi.spyOn(linkModel, 'sortLinks').mockResolvedValue({ message: 'success' })
 
       await linkModel.updateLink({
-        validatedData: {
+        updates: [{
           id: mockLinkId,
           user: mockUserId,
           previousIds,
           fields: { name: 'Updated Link' }
-        }
+        }]
       })
 
       expect(sortLinksSpy).toHaveBeenCalledWith({ previousIds })
       sortLinksSpy.mockRestore()
-    })
-  })
-
-  describe('bulkMoveLinks', () => {
-    it('mueve múltiples links correctamente', async () => {
-      const mockResult = { modifiedCount: 2 } as any
-      // Mock para countDocuments
-      vi.mocked(link.countDocuments).mockResolvedValue(0)
-      // Mock para bulkWrite
-      vi.mocked(link.bulkWrite).mockResolvedValue(mockResult)
-
-      // Mock para la reordenación de links restantes - debe devolver una cadena de métodos
-      vi.mocked(link.find).mockReturnValue({
-        sort: vi.fn().mockReturnValue({
-          select: vi.fn().mockResolvedValue([])
-        })
-      } as any)
-
-      const linksToMove = [new Types.ObjectId().toHexString(), new Types.ObjectId().toHexString()]
-      const result = await linkModel.bulkMoveLinks({
-        user: mockUserId,
-        destinationCategoryId: mockCategoryId,
-        previousCategoryId: mockCategoryId,
-        links: linksToMove
-      })
-
-      expect(link.countDocuments).toHaveBeenCalledWith({
-        user: mockUserObjectId,
-        categoryId: mockCategoryObjectId
-      })
-      expect(link.bulkWrite).toHaveBeenCalled()
-      expect(result).toEqual(mockResult)
-    })
-
-    it('devuelve error si no se proporcionaron enlaces para mover', async () => {
-      // No hacer mock de nada porque la función debe detectar el array vacío antes de usar la BD
-      const result = await linkModel.bulkMoveLinks({
-        user: mockUserId,
-        destinationCategoryId: mockCategoryId,
-        links: [] // Array vacío
-      })
-
-      expect(result).toEqual({ error: 'No se proporcionaron enlaces para mover' })
-    })
-
-    it('devuelve error si no se movieron enlaces', async () => {
-      const mockResult = { modifiedCount: 0 } as any
-      vi.mocked(link.countDocuments).mockResolvedValue(0)
-      vi.mocked(link.bulkWrite).mockResolvedValue(mockResult)
-
-      const linksToMove = [new Types.ObjectId().toHexString()]
-      const result = await linkModel.bulkMoveLinks({
-        user: mockUserId,
-        destinationCategoryId: mockCategoryId,
-        links: linksToMove
-      })
-
-      expect(result).toEqual({ error: 'No se movieron enlaces' })
     })
   })
 

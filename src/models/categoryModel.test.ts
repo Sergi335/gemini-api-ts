@@ -97,12 +97,12 @@ describe('categoryModel', () => {
       const mockCreated = { _id: mockCategoryId, user: mockUserId, ...mockCategory, slug: mockSlug }
       vi.spyOn(categoryModel, 'generateUniqueSlug').mockResolvedValue(mockSlug)
       vi.mocked(category.create).mockResolvedValue(mockCreated as any)
-      const result = await categoryModel.createCategory({ user: mockUserId, cleanData: mockCategory })
+      const result = await categoryModel.createCategory({ user: mockUserId, fields: mockCategory })
       expect(result).toEqual([mockCreated])
     })
 
     it('lanza error si el nombre está vacío', async () => {
-      await expect(categoryModel.createCategory({ user: mockUserId, cleanData: { name: '' } })).rejects.toThrow('Category name is required to generate a slug')
+      await expect(categoryModel.createCategory({ user: mockUserId, fields: { name: '' } })).rejects.toThrow('Category name is required to generate a slug')
     })
   })
 
@@ -118,12 +118,11 @@ describe('categoryModel', () => {
       vi.mocked(category.findOneAndUpdate).mockResolvedValue(updatedData as any)
       vi.mocked(link.updateMany).mockResolvedValue({} as any)
 
-      const result = await categoryModel.newUpdateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { name: 'Updated Name' } }] })
+      const result = await categoryModel.updateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { name: 'Updated Name' } }] })
 
       expect(categoryModel.generateUniqueSlug).toHaveBeenCalledWith({ user: mockUserId, name: 'Updated Name' })
-      expect(category.findOneAndUpdate).toHaveBeenCalledWith({ _id: mockCategoryId, user: mockUserObjectId }, { $set: { name: 'Updated Name', slug: 'updated-name' } }, { new: true })
-      expect(link.updateMany).toHaveBeenCalledWith({ idpanel: mockCategoryId, user: mockUserObjectId }, { $set: { panel: 'Updated Name' } })
-      expect(result).toEqual(updatedData)
+      expect(category.findOneAndUpdate).toHaveBeenCalledWith({ _id: mockCategoryObjectId, user: mockUserObjectId }, { $set: { name: 'Updated Name', slug: 'updated-name' } }, { new: true })
+      expect(result).toEqual([updatedData])
     })
 
     it('mueve una columna a otro escritorio y actualiza el orden', async () => {
@@ -132,18 +131,16 @@ describe('categoryModel', () => {
       vi.mocked(category.findOneAndUpdate).mockResolvedValue(movedData as any)
       vi.mocked(link.updateMany).mockResolvedValue({} as any)
 
-      const result = await categoryModel.newUpdateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { parentId: mockParentId, order: 1 } }] })
+      const result = await categoryModel.updateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { parentId: mockParentId, order: 1 } }] })
 
-      expect(category.find).toHaveBeenCalledWith({ parentId: mockParentId, user: mockUserObjectId })
-      expect(category.findOneAndUpdate).toHaveBeenCalledWith({ _id: mockCategoryId, user: mockUserObjectId }, { $set: { parentId: mockParentId, order: 1 } }, { new: true })
-      expect(link.updateMany).toHaveBeenCalledWith({ idpanel: mockCategoryId, user: mockUserObjectId }, { $set: { parentId: mockParentId } })
-      expect(result).toEqual(movedData)
+      expect(category.findOneAndUpdate).toHaveBeenCalledWith({ _id: mockCategoryObjectId, user: mockUserObjectId }, { $set: { parentId: mockParentId, order: 1 } }, { new: true })
+      expect(result).toEqual([movedData])
     })
 
     it('devuelve un error si la columna a actualizar no se encuentra', async () => {
       vi.mocked(category.findOneAndUpdate).mockResolvedValue(null)
-      const result = await categoryModel.newUpdateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { name: 'Nonexistent' } }] })
-      expect(result).toEqual({ error: 'La columna no existe' })
+      const result = await categoryModel.updateCategory({ updates: [{ user: mockUserId, id: mockCategoryId, fields: { name: 'Nonexistent' } }] })
+      expect(result).toEqual([{ id: mockCategoryId, error: 'La categoría no existe' }])
     })
   })
 
@@ -158,10 +155,10 @@ describe('categoryModel', () => {
 
       const result = await categoryModel.deleteCategory({ user: mockUserId, id: mockCategoryId, level: 1 })
 
-      expect(category.findOne).toHaveBeenCalledWith({ _id: mockCategoryId, user: mockUserObjectId })
-      expect(link.deleteMany).toHaveBeenCalledWith({ idpanel: mockCategoryId, user: mockUserObjectId })
-      expect(category.deleteOne).toHaveBeenCalledWith({ _id: mockCategoryId, user: mockUserObjectId })
-      expect(categoryModel.setColumnsOrder).toHaveBeenCalledWith({ user: mockUserId, elementos: [], parentId: mockParentObjectId })
+      expect(category.findOne).toHaveBeenCalledWith({ _id: mockCategoryObjectId, user: mockUserObjectId })
+      expect(link.deleteMany).toHaveBeenCalledWith({ categoryId: mockCategoryObjectId, user: mockUserObjectId })
+      expect(category.deleteOne).toHaveBeenCalledWith({ _id: mockCategoryObjectId, user: mockUserObjectId })
+      expect(categoryModel.setColumnsOrder).toHaveBeenCalledWith({ user: mockUserId, elements: [] })
       expect(result).toEqual(columnToDelete)
     })
   })

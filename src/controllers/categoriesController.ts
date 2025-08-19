@@ -85,11 +85,11 @@ export class categoriesController {
         update.user = user
       })
 
-      const updatedData = await categoryModel.newUpdateCategory({ updates })
+      const updatedData = await categoryModel.updateCategory({ updates })
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: updatedData })
     } catch (error) {
       console.error('Error in updateCategory:', error)
-      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error inesperado' })
     }
   }
 
@@ -102,10 +102,13 @@ export class categoriesController {
       }
       const { id, level } = req.body
       const column = await categoryModel.deleteCategory({ id, user, level })
+      if ('error' in column) {
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Categoría no encontrada' })
+      }
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: column })
     } catch (error) {
       console.error('Error in deleteCategory:', error)
-      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error inesperado' })
     }
   }
 }

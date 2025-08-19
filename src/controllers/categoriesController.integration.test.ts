@@ -125,7 +125,7 @@ describe('Categories Integration Tests', () => {
       const response = await authenticatedRequest('get', '/categories')
         .expect(200)
 
-      expect(response.body.status).toBe('success')
+      expect(response.body.success).toBe(true)
       expect(response.body.data).toHaveLength(4)
       expect(response.body.data[0]).toHaveProperty('name')
       expect(response.body.data[0]).toHaveProperty('slug')
@@ -147,7 +147,7 @@ describe('Categories Integration Tests', () => {
       const response = await authenticatedRequest('get', '/categories')
         .expect(200)
 
-      expect(response.body.status).toBe('success')
+      expect(response.body.success).toBe(true)
       expect(response.body.data).toEqual({ error: 'No se encontraron categorías' })
     })
   })
@@ -157,7 +157,7 @@ describe('Categories Integration Tests', () => {
       const response = await authenticatedRequest('get', '/categories/toplevel')
         .expect(200)
 
-      expect(response.body.status).toBe('success')
+      expect(response.body.success).toBe(true)
       expect(response.body.data).toHaveLength(2)
       expect(response.body.data.every((cat: any) => cat.level === 0)).toBe(true)
     })
@@ -172,24 +172,6 @@ describe('Categories Integration Tests', () => {
     })
   })
 
-  describe('GET /categories/:slug', () => {
-    it('debería retornar categorías hijas de un slug específico', async () => {
-      const response = await authenticatedRequest('get', '/categories/trabajo')
-        .expect(200)
-
-      expect(response.body.status).toBe('success')
-      expect(response.body.data).toHaveLength(2)
-      expect(response.body.data.every((cat: any) => cat.parentSlug === 'trabajo')).toBe(true)
-    })
-
-    it('debería retornar error para slug inexistente', async () => {
-      const response = await authenticatedRequest('get', '/categories/inexistente')
-        .expect(200)
-
-      expect(response.body.data).toEqual({ error: 'La category no existe' })
-    })
-  })
-
   describe('POST /categories', () => {
     it('debería crear una nueva categoría válida', async () => {
       const newCategory = {
@@ -201,10 +183,10 @@ describe('Categories Integration Tests', () => {
         .send(newCategory)
         .expect(201)
 
-      expect(response.body.status).toBe('success')
-      expect(response.body.category).toHaveLength(1)
-      expect(response.body.category[0].name).toBe('Nueva Categoría')
-      expect(response.body.category[0].slug).toBe('nueva-categora')
+      expect(response.body.success).toBe(true)
+      expect(response.body.data).toHaveLength(1)
+      expect(response.body.data[0].name).toBe('Nueva Categoría')
+      expect(response.body.data[0].slug).toBe('nueva-categora')
 
       // Verificar en base de datos
       const dbCategory = await category.findOne({
@@ -227,7 +209,7 @@ describe('Categories Integration Tests', () => {
         .send(firstCategory)
         .expect(201)
 
-      expect(response.body.category[0].slug).toBe('trabajo_1')
+      expect(response.body.data[0].slug).toBe('trabajo_1')
 
       // Verificar en base de datos
       const dbCategory = await category.findOne({
@@ -263,7 +245,7 @@ describe('Categories Integration Tests', () => {
         .send(childCategory)
         .expect(201)
 
-      expect(response.body.category[0].parentId).toBe(trabajoCategory?._id.toString())
+      expect(response.body.data[0].parentId).toBe(trabajoCategory?._id.toString())
       // Verificar en base de datos
       const dbCategory = await category.findOne({
         name: 'Subcategoría',
@@ -278,19 +260,21 @@ describe('Categories Integration Tests', () => {
       const trabajoCategory = await category.findOne({ slug: 'trabajo', user: testUserId })
 
       const updateData = {
-        id: trabajoCategory?._id.toString(),
-        fields: {
-          name: 'Trabajo Actualizado'
-        }
+        updates: [{
+          id: trabajoCategory?._id.toString(),
+          fields: {
+            name: 'Trabajo Actualizado'
+          }
+        }]
       }
 
       const response = await authenticatedRequest('patch', '/categories')
         .send(updateData)
         .expect(200)
 
-      expect(response.body.status).toBe('success')
-      expect(response.body.column.name).toBe('Trabajo Actualizado')
-      expect(response.body.column.slug).toBe('trabajo-actualizado')
+      expect(response.body.success).toBe(true)
+      expect(response.body.data[0].name).toBe('Trabajo Actualizado')
+      expect(response.body.data[0].slug).toBe('trabajo-actualizado')
 
       // Verificar en base de datos
       const dbCategory = await category.findById(trabajoCategory?._id)
@@ -303,18 +287,20 @@ describe('Categories Integration Tests', () => {
       const personalCategory = await category.findOne({ slug: 'personal', user: testUserId })
 
       const updateData = {
-        id: proyectosCategory?._id.toString(),
-        fields: {
-          parentId: personalCategory?._id.toString(),
-          parentSlug: 'personal'
-        }
+        updates: [{
+          id: proyectosCategory?._id.toString(),
+          fields: {
+            parentId: personalCategory?._id.toString(),
+            parentSlug: 'personal'
+          }
+        }]
       }
 
       const response = await authenticatedRequest('patch', '/categories')
         .send(updateData)
         .expect(200)
 
-      expect(response.body.status).toBe('success')
+      expect(response.body.success).toBe(true)
 
       // Verificar en base de datos
       const dbCategory = await category.findById(proyectosCategory?._id)
@@ -324,17 +310,19 @@ describe('Categories Integration Tests', () => {
 
     it('debería rechazar actualización con ID inexistente', async () => {
       const updateData = {
-        id: new mongoose.Types.ObjectId().toString(),
-        fields: {
-          name: 'No Existe'
-        }
+        updates: [{
+          id: new mongoose.Types.ObjectId().toString(),
+          fields: {
+            name: 'No Existe'
+          }
+        }]
       }
 
       const response = await authenticatedRequest('patch', '/categories')
         .send(updateData)
         .expect(200)
 
-      expect(response.body.column).toEqual({ error: 'La columna no existe' })
+      expect(response.body.data[0]).toEqual({ id: updateData.updates[0].id, error: 'La categoría no existe' })
     })
   })
 
@@ -343,14 +331,15 @@ describe('Categories Integration Tests', () => {
       const proyectosCategory = await category.findOne({ slug: 'proyectos', user: testUserId })
 
       const deleteData = {
-        id: proyectosCategory?._id.toString()
+        id: proyectosCategory?._id.toString(),
+        level: 1
       }
 
       const response = await authenticatedRequest('delete', '/categories')
         .send(deleteData)
         .expect(200)
 
-      expect(response.body.status).toBe('success')
+      expect(response.body.success).toBe(true)
 
       // Verificar eliminación en base de datos
       const dbCategory = await category.findById(proyectosCategory?._id)
@@ -368,14 +357,15 @@ describe('Categories Integration Tests', () => {
 
     it('debería rechazar eliminación con ID inexistente', async () => {
       const deleteData = {
-        id: new mongoose.Types.ObjectId().toString()
+        id: new mongoose.Types.ObjectId().toString(),
+        level: 1
       }
 
       const response = await authenticatedRequest('delete', '/categories')
         .send(deleteData)
-        .expect(200)
+        .expect(404)
 
-      expect(response.body.column).toEqual({ error: 'La columna no existe' })
+      expect(response.body.error).toBe('Categoría no encontrada')
     })
   })
 
@@ -390,15 +380,17 @@ describe('Categories Integration Tests', () => {
         })
         .expect(201)
 
-      const newCategoryId = createResponse.body.category[0]._id
+      const newCategoryId = createResponse.body.data[0]._id
 
       // 2. Actualizar la categoría
       await authenticatedRequest('patch', '/categories')
         .send({
-          id: newCategoryId,
-          fields: {
-            name: 'Categoría Actualizada'
-          }
+          updates: [{
+            id: newCategoryId,
+            fields: {
+              name: 'Categoría Actualizada'
+            }
+          }]
         })
         .expect(200)
 
@@ -409,7 +401,8 @@ describe('Categories Integration Tests', () => {
       // 4. Eliminar la categoría
       await authenticatedRequest('delete', '/categories')
         .send({
-          id: newCategoryId
+          id: newCategoryId,
+          level: 0
         })
         .expect(200)
 

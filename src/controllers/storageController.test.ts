@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { linkModel } from '../models/linkModel'
 import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
+import { constants } from '../utils/constants'
 import { storageController } from './storageController'
 
 // Mock de Firebase Storage
@@ -39,8 +40,9 @@ describe('storageController', () => {
     mockRequest = {
       user: {
         _id: 'user123',
-        name: 'testuser'
-      }, // Añadir tanto _id como name
+        name: 'testuser',
+        email: 'testuser@example.com'
+      },
       body: {},
       query: {}
     }
@@ -71,8 +73,9 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        backgrounds: expect.arrayContaining([
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: expect.arrayContaining([
           expect.objectContaining({
             url: mockUrl,
             nombre: 'bg1.jpg'
@@ -90,7 +93,10 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith(error)
+      expect(mockResponse.status).toHaveBeenCalledWith(500)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE
+      })
     })
   })
 
@@ -128,15 +134,16 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
+      expect(mockRequest.user).toBeDefined() // Asegurar que el usuario está autenticado
       expect(uploadBytes).toHaveBeenCalled()
       expect(linkModel.setImagesInDb).toHaveBeenCalledWith({
         url: mockDownloadURL,
-        user: 'testuser', // Cambiado de 'testuser' a usar _id
-        linkId: 'link123' // Cambiado de linkId a id
+        user: 'user123',
+        id: 'link123'
       })
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        status: 'success',
-        link: mockResult
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: mockResult
       })
     })
 
@@ -148,7 +155,9 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith({
+      expect(mockResponse.status).toHaveBeenCalledWith(400)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
         error: 'No hemos recibido imagen'
       })
     })
@@ -163,8 +172,8 @@ describe('storageController', () => {
 
       expect(mockResponse.status).toHaveBeenCalledWith(401)
       expect(mockResponse.json).toHaveBeenCalledWith({
-        status: 'fail',
-        message: 'Usuario no autenticado'
+        ...constants.API_FAIL_RESPONSE,
+        error: constants.API_NOT_USER_MESSAGE
       })
     })
 
@@ -178,7 +187,8 @@ describe('storageController', () => {
       )
 
       expect(mockResponse.status).toHaveBeenCalledWith(500)
-      expect(mockResponse.send).toHaveBeenCalledWith({
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
         error: 'Error al subir el archivo'
       })
     })
@@ -210,15 +220,16 @@ describe('storageController', () => {
 
       expect(deleteObject).toHaveBeenCalled()
       expect(userModel.editUser).toHaveBeenCalledWith({
-        email: 'testuser', // Usa name para email
-        user: { quota: 3976 } // 5000 - 1024
+        email: 'testuser@example.com',
+        fields: { quota: 3976 }
       })
       expect(linkModel.deleteImageOnDb).toHaveBeenCalledWith({
         url: 'testuser/images/linkImages/test.jpg',
-        user: 'testuser', // Usa _id para user
-        linkId: 'link123' // Cambiado de linkId a id
+        user: 'user123',
+        id: 'link123'
       })
-      expect(mockResponse.send).toHaveBeenCalledWith({
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
         message: 'Imagen eliminada exitosamente'
       })
     })
@@ -231,8 +242,10 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        error: 'No hemor recibido la imagen en la petición'
+      expect(mockResponse.status).toHaveBeenCalledWith(400)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'No hemos recibido la imagen en la petición'
       })
     })
 
@@ -246,8 +259,9 @@ describe('storageController', () => {
       )
 
       expect(mockResponse.status).toHaveBeenCalledWith(500)
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        error: 'storage/object-not-found'
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Error al eliminar la imagen de la base de datos'
       })
     })
   })
@@ -287,15 +301,13 @@ describe('storageController', () => {
 
       expect(linkModel.setLinkImgInDb).toHaveBeenCalledWith({
         url: mockDownloadURL,
-        user: 'testuser',
-        linkId: 'link123'
+        user: 'user123',
+        id: 'link123'
       })
-      expect(mockResponse.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: '¡Archivo o blob subido!',
-          url: mockDownloadURL
-        })
-      )
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: { url: mockDownloadURL, name: expect.stringContaining('.png') }
+      })
     })
 
     it('maneja iconos predefinidos cuando no hay archivo', async () => {
@@ -311,8 +323,8 @@ describe('storageController', () => {
 
       expect(linkModel.setLinkImgInDb).toHaveBeenCalledWith({
         url: '/default/icon.png',
-        user: 'testuser',
-        linkId: 'link123'
+        user: 'user123',
+        id: 'link123'
       })
     })
   })
@@ -355,16 +367,17 @@ describe('storageController', () => {
       )
 
       expect(userModel.editUser).toHaveBeenCalledWith({
-        email: 'testuser',
-        user: { quota: 2048 }
+        email: 'testuser@example.com',
+        fields: { quota: 2048 }
       })
       expect(userModel.updateProfileImage).toHaveBeenCalledWith({
-        url: mockDownloadURL,
-        user: 'testuser'
+        profileImage: mockDownloadURL,
+        email: 'testuser@example.com'
       })
-      expect(mockResponse.send).toHaveBeenCalledWith({
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
         message: '¡Archivo o blob subido!',
-        url: mockDownloadURL
+        data: { url: mockDownloadURL }
       })
     })
 
@@ -392,8 +405,8 @@ describe('storageController', () => {
 
       expect(deleteObject).toHaveBeenCalledWith(mockExistingItem)
       expect(userModel.editUser).toHaveBeenCalledWith({
-        email: 'testuser',
-        user: { quota: 6024 } // 5000 + (2048 - 1024)
+        email: 'testuser@example.com',
+        fields: { quota: 6024 } // 5000 + (2048 - 1024)
       })
     })
 
@@ -410,7 +423,8 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith({
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
         error: 'No tienes espacio suficiente'
       })
     })
@@ -424,7 +438,8 @@ describe('storageController', () => {
       )
 
       expect(mockResponse.status).toHaveBeenCalledWith(400)
-      expect(mockResponse.send).toHaveBeenCalledWith({
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
         error: 'No se proporcionó ningún archivo'
       })
     })
@@ -452,10 +467,11 @@ describe('storageController', () => {
 
       expect(deleteObject).toHaveBeenCalled()
       expect(userModel.editUser).toHaveBeenCalledWith({
-        email: 'testuser',
-        user: { quota: 4488 } // 5000 - 512
+        email: 'testuser@example.com',
+        fields: { quota: 4488 } // 5000 - 512
       })
-      expect(mockResponse.send).toHaveBeenCalledWith({
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
         message: 'Imagen eliminada exitosamente'
       })
     })
@@ -470,8 +486,9 @@ describe('storageController', () => {
       )
 
       expect(mockResponse.status).toHaveBeenCalledWith(500)
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        error: 'storage/object-not-found'
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Error al eliminar la imagen'
       })
     })
   })
@@ -507,22 +524,23 @@ describe('storageController', () => {
       expect(getDownloadURL).toHaveBeenCalledTimes(mockUserItems.length)
 
       // Verificar el contenido de la respuesta
-      expect(mockResponse.send).toHaveBeenCalledWith(
-        expect.arrayContaining([
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: expect.arrayContaining([
           expect.objectContaining({
             url: mockUrl,
             nombre: mockMetadata.name,
             clase: 'user'
           })
         ])
-      )
+      })
     })
 
     it('maneja error cuando no hay iconos de usuario', async () => {
       const error = new Error('No icons found')
 
       // Mock para ref que devuelve una referencia válida
-      const userRef = { fullPath: 'testuser/images/icons' }
+      const userRef = { fullPath: 'testuser@example.com/images/icons' }
       vi.mocked(ref).mockReturnValue(userRef as any)
 
       // Mock para listAll que falla
@@ -533,7 +551,11 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith(error)
+      expect(mockResponse.status).toHaveBeenCalledWith(500)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Error al leer la carpeta'
+      })
     })
 
     it('devuelve error cuando el usuario no está autenticado', async () => {
@@ -546,8 +568,8 @@ describe('storageController', () => {
 
       expect(mockResponse.status).toHaveBeenCalledWith(401)
       expect(mockResponse.json).toHaveBeenCalledWith({
-        status: 'fail',
-        message: 'Usuario no autenticado'
+        ...constants.API_FAIL_RESPONSE,
+        error: constants.API_NOT_USER_MESSAGE
       })
     })
   })
@@ -594,8 +616,9 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith({
-        downloadUrl: mockUrl
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: mockUrl
       })
     })
   })
@@ -613,7 +636,10 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith(mockUrl)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: mockUrl
+      })
     })
 
     it('maneja errores al obtener URL', async () => {
@@ -627,7 +653,11 @@ describe('storageController', () => {
         mockResponse as Response
       )
 
-      expect(mockResponse.send).toHaveBeenCalledWith(error)
+      expect(mockResponse.status).toHaveBeenCalledWith(500)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Error al obtener la URL de descarga'
+      })
     })
   })
 
@@ -697,14 +727,24 @@ describe('storageController', () => {
         expect(mockResponse.status).toHaveBeenCalledWith(401)
 
         if (methodName === 'deleteIcon') {
-          expect(mockResponse.send).toHaveBeenCalledWith('Error usuario no proporcionado')
+          expect(mockResponse.status).toHaveBeenCalledWith(401)
+          expect(mockResponse.json).toHaveBeenCalledWith({
+            ...constants.API_FAIL_RESPONSE,
+            error: constants.API_NOT_USER_MESSAGE
+          })
+        } else if (methodName === 'restoreUserBackup') {
+          expect(mockResponse.status).toHaveBeenCalledWith(401)
+          expect(mockResponse.json).toHaveBeenCalledWith({
+            status: 'fail',
+            message: 'Usuario no autenticado'
+          })
         } else {
           // Verificar que se llamó json con el mensaje correcto
           const jsonCalls = (mockResponse.json as ReturnType<typeof vi.fn>)?.mock?.calls
           if (Array.isArray(jsonCalls) && jsonCalls.length > 0) {
             expect(jsonCalls[0][0]).toMatchObject({
-              status: 'fail',
-              message: 'Usuario no autenticado'
+              ...constants.API_FAIL_RESPONSE,
+              error: constants.API_NOT_USER_MESSAGE
             })
           }
         }

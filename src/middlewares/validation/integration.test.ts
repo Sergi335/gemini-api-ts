@@ -106,13 +106,14 @@ describe('Validación Zod Integration Tests', () => {
   })
 
   describe('DELETE /storage/image', () => {
-    it('debe validar datos de eliminación de imagen', async () => {
+    it('debe validar datos de eliminación de imagenn', async () => {
       const invalidData = {
-        // Falta imageName
+        foo: 'bar'
       }
 
       const response = await request(testApp)
         .delete('/storage/image')
+        .set('Content-Type', 'application/json')
         .send(invalidData)
 
       expect(response.status).toBe(400)
@@ -121,7 +122,7 @@ describe('Validación Zod Integration Tests', () => {
         message: 'Validation failed',
         errors: expect.arrayContaining([
           expect.objectContaining({
-            field: 'body.imageName',
+            field: 'body.image',
             message: 'Required',
             code: 'invalid_type'
           })

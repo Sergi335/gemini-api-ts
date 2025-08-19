@@ -77,7 +77,7 @@ export class categoryModel {
     return [data]
   }
 
-  static async newUpdateCategory ({ updates }: NewValidatedCategoryData): Promise<Array<mongoose.Document | { id: string | undefined, error: string }> | CategoryErrorResponse> {
+  static async updateCategory ({ updates }: NewValidatedCategoryData): Promise<Array<mongoose.Document | { id: string | undefined, error: string }> | CategoryErrorResponse> {
     try {
       const updatedData = []
       for (const update of updates) {
