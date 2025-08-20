@@ -1,6 +1,8 @@
+import { Readability } from '@mozilla/readability'
 import { Response } from 'express'
+import { JSDOM } from 'jsdom'
 import mongoose from 'mongoose'
-import { linkModel } from '../models/linkModel'
+import { LinkFields, linkModel } from '../models/linkModel'
 import { RequestWithUser } from '../types/express'
 import { constants } from '../utils/constants'
 import { getLinkNameByUrlLocal, getLinkStatusLocal } from '../utils/linksUtils'
@@ -221,6 +223,69 @@ export class linksController {
     } catch (error) {
       console.error('Error in setBookMarksOrder:', error)
       return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
+    }
+  }
+
+  static async extractArticle (req: RequestWithUser, res: Response): Promise<Response> {
+    try {
+      const user = req.user?._id
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+
+      const { id } = req.params
+      const link = await linkModel.getLinkById({ user, id }) as LinkFields | { error: string }
+
+      if ('error' in link) {
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Link not found' })
+      }
+
+      if (link?.extractedArticle != null) {
+        return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: link.extractedArticle })
+      }
+      if (link?.url === null || link?.url === undefined || link?.url === '') {
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Link URL is null' })
+      }
+      const response = await fetch(link.url)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch URL: ${response.statusText}`)
+      }
+      const html = await response.text()
+      const doc = new JSDOM(html, {
+        url: link.url
+      })
+      const reader = new Readability(doc.window.document)
+      const article = reader.parse()
+      if (article == null) {
+        return res.status(500).json({ error: 'Failed to parse article' })
+      }
+
+      const extractedArticle = {
+        title: article.title ?? '',
+        content: article.content ?? '',
+        textContent: article.textContent ?? '',
+        length: article.length ?? 0,
+        excerpt: article.excerpt ?? '',
+        byline: article.byline ?? '',
+        dir: article.dir ?? '',
+        siteName: article.siteName ?? ''
+      }
+      const updates = [
+        {
+          id,
+          user,
+          fields: {
+            extractedArticle
+          }
+        }
+      ]
+
+      const dbUpdate = await linkModel.updateLink({ updates })
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: dbUpdate })
+    } catch (error) {
+      console.error('Error in extractArticle:', error)
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Failed to extract article', details: errorMessage })
     }
   }
 }

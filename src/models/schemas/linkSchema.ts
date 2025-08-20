@@ -43,6 +43,10 @@ const LinkSchema = new Schema({
   readlist: {
     type: Boolean,
     default: false
+  },
+  extractedArticle: {
+    type: Object,
+    required: false
   }
 }, {
   timestamps: true,

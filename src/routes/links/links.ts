@@ -45,6 +45,7 @@ linksRouter.post('/',
   validateBody(createLinkBodySchema),
   linksController.createLink
 )
+linksRouter.post('/:id/extract', validateParams(linkIdParamsSchema), linksController.extractArticle)
 linksRouter.patch('/',
   validateBody(updateLinkBodySchema),
   linksController.updateLink

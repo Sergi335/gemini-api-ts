@@ -18,6 +18,16 @@ export interface LinkFields {
   order?: number
   linkId?: string | string[]
   id?: string
+  extractedArticle?: {
+    title: string
+    content: string
+    textContent: string
+    length: number
+    excerpt: string
+    byline: string
+    dir: string
+    siteName: string
+  }
 }
 export interface ValidatedLinkData extends LinkFields {
   previousIds?: LinkFields[]

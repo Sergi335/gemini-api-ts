@@ -9,6 +9,7 @@ import { categoriesRouter } from './routes/categories/categories'
 import { linksRouter } from './routes/links/links'
 import { storageRouter } from './routes/storage/storage'
 
+
 const app = express()
 
 // Middleware
@@ -21,6 +22,7 @@ app.use('/auth', authRouter)
 app.use('/links', checkUserSession, linksRouter)
 app.use('/categories', checkUserSession, categoriesRouter)
 app.use('/storage', checkUserSession, storageRouter)
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' })
 })

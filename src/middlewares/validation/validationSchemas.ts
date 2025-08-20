@@ -59,7 +59,8 @@ export const updateLinkBodySchema = z.object({
       categoryId: z.string().optional(),
       order: z.number().int().min(0).optional(),
       notes: z.string().optional(),
-      bookmark: z.boolean().optional()
+      bookmark: z.boolean().optional(),
+      extractedArticle: z.null().optional()
     }).partial(),
     destinyIds: z.array(z.object({
       id: z.string().min(1, 'ID de destino requerido'),
