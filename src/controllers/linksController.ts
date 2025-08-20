@@ -231,6 +231,7 @@ export class linksController {
         return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Link URL is null' })
       }
       const response = await fetch(link.url)
+      console.log('🚀 ~ linksController ~ extractArticle ~ response:', response)
       if (!response.ok) {
         throw new Error(`Failed to fetch URL: ${response.statusText}`)
       }
