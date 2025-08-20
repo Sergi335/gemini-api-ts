@@ -149,22 +149,6 @@ export class linksController {
     }
   }
 
-  // static async bulkMoveLinks (req: RequestWithUser, res: Response): Promise<Response> {
-  //   try {
-  //     const user = req.user?._id
-  //     if (user === undefined || user === null || user === '') {
-  //       return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
-  //     }
-  //     const { destinationCategoryId, links, previousCategoryId } = req.body
-
-  //     const link = await linkModel.bulkMoveLinks({ user, destinationCategoryId, previousCategoryId, links })
-  //     return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: link })
-  //   } catch (error) {
-  //     console.error('Error in bulkMoveLinks:', error)
-  //     return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
-  //   }
-  // }
-
   static async getLinkNameByUrl (req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const user = req.user?._id

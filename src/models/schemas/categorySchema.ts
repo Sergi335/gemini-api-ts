@@ -6,7 +6,6 @@ const CategorySchema = new Schema({
   },
   parentId: {
     type: Schema.Types.ObjectId
-    // ref: 'category' // opcional, para population
   },
   isEmpty: {
     type: Boolean
@@ -15,8 +14,8 @@ const CategorySchema = new Schema({
     type: Number
   },
   user: {
-    type: Schema.Types.ObjectId // Cambiar a ObjectId
-    // ref: 'User' // opcional, para population
+    type: Schema.Types.ObjectId,
+    index: true
   },
   slug: {
     type: String,

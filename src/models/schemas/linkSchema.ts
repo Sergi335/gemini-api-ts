@@ -18,13 +18,14 @@ const LinkSchema = new Schema({
     type: String
   },
   categoryId: {
-    type: Schema.Types.ObjectId // Cambiar a ObjectId
+    type: Schema.Types.ObjectId
   },
   order: {
     type: Number
   },
   user: {
-    type: Schema.Types.ObjectId // Cambiar a ObjectId
+    type: Schema.Types.ObjectId,
+    index: true
   },
   notes: {
     type: String
@@ -52,5 +53,8 @@ const LinkSchema = new Schema({
   timestamps: true,
   versionKey: false
 })
+
+LinkSchema.index({ user: 1, categoryId: 1 })
+LinkSchema.index({ user: 1, url: 1 })
 
 export default model('link', LinkSchema)
