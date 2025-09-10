@@ -58,7 +58,7 @@ export const updateLinkBodySchema = z.object({
       imgUrl: z.string().url().optional(),
       categoryId: z.string().optional(),
       order: z.number().int().min(0).optional(),
-      notes: z.string().optional(),
+      notes: z.record(z.object({}).passthrough()).optional(),
       bookmark: z.boolean().optional(),
       extractedArticle: z.null().optional()
     }).partial(),

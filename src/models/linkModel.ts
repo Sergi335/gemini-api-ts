@@ -1,9 +1,11 @@
 import type { DeleteResult } from 'mongodb'
 import mongoose from 'mongoose'
 import { LinkErrorResponse } from '../types/linkModel.types'
+import category from './schemas/categorySchema'
 import link from './schemas/linkSchema'
 
 export interface LinkFields {
+  _id?: string
   name?: string
   description?: string
   url?: string
@@ -14,7 +16,7 @@ export interface LinkFields {
   images?: string[]
   bookmark?: boolean
   bookmarkOrder?: number
-  readList?: boolean
+  readlist?: boolean
   order?: number
   linkId?: string | string[]
   id?: string
@@ -42,6 +44,10 @@ export interface ValidatedLinkData extends LinkFields {
 export interface NewValidatedLinkData extends ValidatedLinkData {
   updates: ValidatedLinkData[]
 }
+export interface LinkWithCategoryChain extends LinkFields {
+  categoryChain?: string | { error: string }
+}
+export type SearchResults = LinkWithCategoryChain[]
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class linkModel {
   // Quitar try catch lanzar errores con throw y gestionar errores en el controlador
@@ -96,24 +102,6 @@ export class linkModel {
     return data
   }
 
-  // static async updateLink ({ validatedData }: { validatedData: ValidatedLinkData }): Promise<mongoose.Document | { error: string }> {
-  //   const { user, id, destinyIds, fields, previousIds } = validatedData
-  //   const userObjectId = new mongoose.Types.ObjectId(user)
-
-  //   const updatedLink = await link.findOneAndUpdate({ _id: id, user: userObjectId }, { $set: fields }, { new: true })
-  //   // Cuando se arrastra el link a otra categoría, se ordenan los links de la categoría antigua y de la nueva
-  //   if (previousIds !== undefined) {
-  //     await linkModel.sortLinks({ previousIds })
-  //   }
-  //   if (destinyIds !== undefined) {
-  //     await linkModel.sortLinks({ destinyIds })
-  //   }
-  //   if (updatedLink == null) {
-  //     return { error: 'El link no existe' }
-  //   }
-  //   return updatedLink
-  // }
-
   static async updateLink ({ updates }: NewValidatedLinkData): Promise<Array<mongoose.Document | { id: string | undefined, error: string }> | LinkErrorResponse> {
     if (updates[0].previousIds !== undefined) {
       await linkModel.sortLinks({ previousIds: updates[0].previousIds })
@@ -139,62 +127,6 @@ export class linkModel {
       return { error: (error as Error).message }
     }
   }
-
-  // static async bulkMoveLinks ({ user, destinationCategoryId, previousCategoryId, links }: ValidatedLinkData): Promise<import('mongodb').BulkWriteResult | { error: string }> {
-  //   const userObjectId = new mongoose.Types.ObjectId(user)
-  //   const destinationObjectId = new mongoose.Types.ObjectId(destinationCategoryId)
-
-  //   // Contar los links existentes en la categoría de destino
-  //   const existingLinksCount = await link.countDocuments({
-  //     user: userObjectId,
-  //     categoryId: destinationObjectId
-  //   })
-
-  //   // Mover los links y asignar orden secuencial a partir del conteo actual
-  //   if (links == null || !Array.isArray(links) || links.length === 0) {
-  //     return { error: 'No se proporcionaron enlaces para mover' }
-  //   }
-
-  //   const updateOperations = links.map((linkId, index) => ({
-  //     updateOne: {
-  //       filter: { _id: new mongoose.Types.ObjectId(linkId), user: userObjectId },
-  //       update: {
-  //         $set: {
-  //           categoryId: destinationObjectId,
-  //           order: existingLinksCount + index
-  //         }
-  //       }
-  //     }
-  //   }))
-
-  //   const result = await link.bulkWrite(updateOperations)
-
-  //   if (result.modifiedCount === 0) {
-  //     return { error: 'No se movieron enlaces' }
-  //   }
-
-  //   // Reordenar los links que quedan en la categoría anterior
-  //   if (typeof previousCategoryId === 'string' && previousCategoryId.trim() !== '') {
-  //     const previousCategoryObjectId = new mongoose.Types.ObjectId(previousCategoryId)
-  //     const remainingLinks = await link.find({
-  //       user: userObjectId,
-  //       categoryId: previousCategoryObjectId
-  //     }).sort({ order: 1 }).select('_id')
-
-  //     if (remainingLinks.length > 0) {
-  //       const reorderOperations = remainingLinks.map((linkDoc, index) => ({
-  //         updateOne: {
-  //           filter: { _id: linkDoc._id, user: userObjectId },
-  //           update: { $set: { order: index } }
-  //         }
-  //       }))
-
-  //       await link.bulkWrite(reorderOperations)
-  //     }
-  //   }
-
-  //   return result
-  // }
 
   static async deleteLink ({ user, linkId }: ValidatedLinkData): Promise<mongoose.Document | DeleteResult | { error: string }> {
     const userObjectId = new mongoose.Types.ObjectId(user)
@@ -359,8 +291,9 @@ export class linkModel {
     }
   }
 
-  static async searchLinks ({ user, query }: { user: string, query: string }): Promise<mongoose.Document[]> {
+  static async searchLinks ({ user, query }: { user: string, query: RegExp }): Promise<SearchResults> {
     const userObjectId = new mongoose.Types.ObjectId(user)
+    const response: SearchResults = []
     const data = await link.find({
       $or: [
         { name: query, user: userObjectId },
@@ -368,7 +301,26 @@ export class linkModel {
         { notes: query, user: userObjectId }
       ]
     })
-    return data
+    await Promise.all(data.map(async linkDoc => {
+      response.push({
+        name: linkDoc.name,
+        description: linkDoc.description,
+        url: linkDoc.url,
+        imgUrl: linkDoc.imgUrl,
+        categoryName: linkDoc.categoryName,
+        categoryId: (linkDoc.categoryId != null) ? linkDoc.categoryId.toString() : undefined,
+        notes: linkDoc.notes,
+        images: linkDoc.images,
+        bookmark: linkDoc.bookmark,
+        bookmarkOrder: linkDoc.bookmarkOrder,
+        readlist: linkDoc.readlist,
+        order: linkDoc.order,
+        extractedArticle: linkDoc.extractedArticle,
+        _id: linkDoc._id.toString(),
+        categoryChain: await this.getParentCategoriesChain({ user, id: linkDoc._id.toString() })
+      })
+    }))
+    return response
   }
 
   static async setBookMarksOrder ({ user, links }: { user: string, links: Array<[string, number]> }): Promise<Array<{ id: string, order: number }>> {
@@ -424,6 +376,53 @@ export class linkModel {
       return { message: 'success' }
     } catch (error) {
       return { error }
+    }
+  }
+
+  // Nuevo método: devuelve array de categorías ascendentes (padre inmediato primero)
+  static async getParentCategoriesChain ({ user, id }: ValidatedLinkData): Promise<string | { error: string }> {
+    try {
+      const userObjectId = new mongoose.Types.ObjectId(user)
+      const linkObjectId = new mongoose.Types.ObjectId(id)
+
+      // 1) obtener el link y su categoryId
+      const linkDoc = await link.findOne({ user: userObjectId, _id: linkObjectId }).select('categoryId')
+      if (linkDoc == null || linkDoc?.categoryId == null) return { error: 'Link o categoría del link no encontrada' }
+
+      const ancestors = []
+      let currentCategoryId = linkDoc.categoryId
+
+      // 2) recorrer ascendiendo por parent hasta null
+      // defensiva: límite de iteraciones para evitar loops infinitos (ej. 50)
+      const MAX_DEPTH = 50
+      let depth = 0
+
+      while (currentCategoryId != null && depth < MAX_DEPTH) {
+        const catDoc = await category.findOne({ user: userObjectId, _id: new mongoose.Types.ObjectId(currentCategoryId) })
+        if (catDoc === null || catDoc === undefined) {
+          // si no se encuentra la categoría actual, devolvemos error
+          return { error: `Categoría con id ${currentCategoryId.toString()} no encontrada` }
+        }
+
+        ancestors.push(catDoc.slug)
+
+        // suponer que el campo padre se llama 'parent' y puede ser ObjectId o null
+        // obtener el siguiente parent (puede ser undefined/null)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parentId: any = (catDoc as any).parentId
+
+        if (parentId === null || parentId === undefined) break
+
+        currentCategoryId = parentId
+        depth += 1
+      }
+
+      if (depth >= MAX_DEPTH) {
+        return { error: 'Máxima profundidad alcanzada, posible ciclo en parents' }
+      }
+      return ancestors.reverse().join('/')
+    } catch (error) {
+      return { error: (error as Error).message }
     }
   }
 }

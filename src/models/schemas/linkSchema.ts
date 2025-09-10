@@ -28,7 +28,7 @@ const LinkSchema = new Schema({
     index: true
   },
   notes: {
-    type: String
+    type: Object
   },
   images: {
     type: Array
