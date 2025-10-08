@@ -21,7 +21,7 @@ export const checkUserSession = async (req: RequestWithUser, res: Response, next
     const decodedClaims = await getAuth().verifySessionCookie(sessionCookie, true)
     const userEmail = decodedClaims.email ?? ''
     const user = await userModel.getUser({ email: userEmail })
-    console.log('🚀 ~ checkUserSession ~ user:', user)
+    // console.log('🚀 ~ checkUserSession ~ user:', user)
 
     if (user == null || 'error' in user) {
       res.status(401).send({ error: 'Usuario no encontrado' })

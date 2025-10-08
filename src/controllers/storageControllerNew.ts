@@ -1,21 +1,11 @@
 import { Response } from 'express'
 // Para Cloudflare R2, instalar: npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
-// import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
-// import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { linkModel } from '../models/linkModel'
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { LinkFields, linkModel } from '../models/linkModel'
 import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
 import { constants } from '../utils/constants'
-
-// Tipos temporales para desarrollo - remover cuando se instalen las dependencias
-/* eslint-disable @typescript-eslint/no-explicit-any */
-declare const S3Client: any
-declare const PutObjectCommand: any
-declare const DeleteObjectCommand: any
-declare const ListObjectsV2Command: any
-declare const GetObjectCommand: any
-declare const HeadObjectCommand: any
-declare const getSignedUrl: any
 
 // Configuración de Cloudflare R2
 const r2Client = new S3Client({
@@ -39,7 +29,7 @@ export class storageControllerNew {
       Bucket: BUCKET_NAME,
       Key: key
     })
-    return getSignedUrl(r2Client, command, { expiresIn })
+    return await getSignedUrl(r2Client, command, { expiresIn })
   }
 
   /**
@@ -50,7 +40,7 @@ export class storageControllerNew {
       Bucket: BUCKET_NAME,
       Key: key
     })
-    return getSignedUrl(r2Client, command, { expiresIn })
+    return await getSignedUrl(r2Client, command, { expiresIn })
   }
 
   static async getBackgroundsMiniatures (req: RequestWithUser, res: Response): Promise<Response> {
@@ -68,10 +58,23 @@ export class storageControllerNew {
       const response = await r2Client.send(listCommand)
       const objects = response.Contents ?? []
 
+      console.log('🔍 Objetos encontrados en miniatures/:', objects.length)
+      objects.forEach((obj: any) => {
+        console.log('  - Key:', obj.Key, '| Size:', obj.Size)
+      })
+
       const backgroundsPromises = objects.map(async (obj: any) => {
         if ((obj.Key as string) === null || (obj.Key as string) === undefined || (obj.Key as string) === '') return null
 
-        const signedUrl = await this.getSignedReadUrl(obj.Key as string)
+        // Ignorar carpetas (terminan en / o tienen tamaño 0)
+        if ((obj.Key as string).endsWith('/') || obj.Size === 0) {
+          console.log('⏭️  Ignorando carpeta o archivo vacío:', obj.Key)
+          return null
+        }
+
+        // FIX: Usar storageControllerNew en lugar de this
+        const signedUrl = await storageControllerNew.getSignedReadUrl(obj.Key as string)
+        console.log('✅ URL generada para:', obj.Key)
         return {
           url: signedUrl,
           nombre: (obj.Key as string).split('/').pop() ?? (obj.Key as string)
@@ -103,8 +106,6 @@ export class storageControllerNew {
       const file = req.file
       const uniqueSuffix = Date.now().toString() + '-' + Math.round(Math.random() * 1E9).toString()
       const extension = typeof file?.originalname === 'string' ? String(file.originalname.split('.').pop() ?? 'jpg') : 'jpg'
-
-      // Construir la clave del objeto en R2
       const key = `${email}/images/linkImages/${uniqueSuffix}.${extension}`
 
       const putCommand = new PutObjectCommand({
@@ -116,20 +117,38 @@ export class storageControllerNew {
 
       await r2Client.send(putCommand)
 
-      // Generar URL firmada para acceso
-      const signedUrl = await this.getSignedReadUrl(key)
+      // Actualizar la cuota del usuario
+      const userResult = await userModel.getUser({ email })
+      if ('error' in userResult) {
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Usuario no encontrado' })
+      }
+      const quota = userResult.quota ?? 0
+      const newQuota = quota + file.size
+      if (newQuota > Number(process.env.MAX_USER_QUOTA) && email !== process.env.SUPERUSER_EMAIL) {
+        await r2Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }))
+        return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
+      }
+      await userModel.editUser({ email, fields: { quota: newQuota } })
 
+      // IMPORTANTE: Guardar en la base de datos
       try {
-        const resultadoDb = await linkModel.setImagesInDb({ url: key, user: id, id: linkId }) // Guardamos la key, no la URL firmada
+      // Guardar la KEY en la base de datos, no la URL firmada
+        const resultadoDb = await linkModel.setImagesInDb({ url: key, user: id, id: linkId })
+
+        // Generar URL firmada para la respuesta
+        const signedUrl = await storageControllerNew.getSignedReadUrl(key)
+
         return res.status(200).json({
           ...constants.API_SUCCESS_RESPONSE,
-          data: {
-            ...resultadoDb,
-            signedUrl // Devolvemos la URL firmada para uso inmediato
-          }
+          data: { ...resultadoDb, signedUrl }
         })
       } catch (error) {
-        return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al guardar la imagen en la base de datos' })
+      // Si falla guardar en DB, eliminar el archivo de R2
+        await r2Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }))
+        return res.status(500).json({
+          ...constants.API_FAIL_RESPONSE,
+          error: 'Error al guardar la imagen en la base de datos'
+        })
       }
     } catch (error) {
       console.error('Error al subir el archivo:', error)
@@ -232,7 +251,7 @@ export class storageControllerNew {
       })
 
       await r2Client.send(putCommand)
-      const signedUrl = await this.getSignedReadUrl(key)
+      const signedUrl = await storageControllerNew.getSignedReadUrl(key)
 
       try {
         await linkModel.setLinkImgInDb({ url: key, user: userId, id: linkId })
@@ -321,7 +340,7 @@ export class storageControllerNew {
       const userIconsPromises = objects.map(async (obj: any) => {
         if ((obj.Key as string) === null || (obj.Key as string) === undefined || (obj.Key as string) === '') return null
 
-        const signedUrl = await this.getSignedReadUrl(obj.Key as string)
+        const signedUrl = await storageControllerNew.getSignedReadUrl(obj.Key as string)
         const fileName = (obj.Key as string).split('/').pop() ?? (obj.Key as string)
 
         return {
@@ -351,7 +370,7 @@ export class storageControllerNew {
 
     try {
       const key = `backgrounds/${nombre}`
-      const signedUrl = await this.getSignedReadUrl(key)
+      const signedUrl = await storageControllerNew.getSignedReadUrl(key)
 
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: signedUrl })
     } catch (error) {
@@ -370,7 +389,7 @@ export class storageControllerNew {
 
       const fileName = `${email}dataBackup.json`
       const key = `${email}/backups/${fileName}`
-      const signedUrl = await this.getSignedReadUrl(key)
+      const signedUrl = await storageControllerNew.getSignedReadUrl(key)
 
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: signedUrl })
     } catch (error) {
@@ -413,7 +432,7 @@ export class storageControllerNew {
       })
 
       await r2Client.send(putCommand)
-      const signedUrl = await this.getSignedReadUrl(key)
+      const signedUrl = await storageControllerNew.getSignedReadUrl(key)
 
       return res.status(200).json({
         ...constants.API_SUCCESS_RESPONSE,
@@ -552,7 +571,7 @@ export class storageControllerNew {
       }
 
       // Generar URL firmada para la imagen
-      const signedUrl = await this.getSignedReadUrl(key)
+      const signedUrl = await storageControllerNew.getSignedReadUrl(key)
 
       try {
         await userModel.updateProfileImage({ profileImage: key, email }) // Guardar la key, no la URL firmada
@@ -601,7 +620,7 @@ export class storageControllerNew {
               Key: obj.Key as string
             })
 
-            return r2Client.send(deleteCommand)
+            return await r2Client.send(deleteCommand)
           })
 
           await Promise.all(deletePromises)
@@ -626,7 +645,7 @@ export class storageControllerNew {
             Key: obj.Key as string
           })
 
-          return r2Client.send(deleteCommand)
+          return await r2Client.send(deleteCommand)
         })
 
         await Promise.all(deleteUserPromises)
@@ -659,7 +678,7 @@ export class storageControllerNew {
         return res.status(403).json({ ...constants.API_FAIL_RESPONSE, error: 'Acceso no autorizado al archivo' })
       }
 
-      const signedUrl = await this.getSignedReadUrl(key, expiresIn)
+      const signedUrl = await storageControllerNew.getSignedReadUrl(key, expiresIn)
 
       return res.status(200).json({
         ...constants.API_SUCCESS_RESPONSE,
@@ -671,6 +690,147 @@ export class storageControllerNew {
     } catch (error) {
       console.error('Error al generar URL firmada:', error)
       return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al generar URL de acceso' })
+    }
+  }
+  // ...existing code...
+
+  /**
+   * Obtener URLs firmadas de las imágenes de un link específico
+   */
+  static async getLinkImages (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
+    const userId = req.user?._id
+    const { linkId } = req.params // o req.query según tu ruta
+
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+    }
+
+    if (linkId === undefined || linkId === null || linkId === '') {
+      return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'ID del link requerido' })
+    }
+
+    try {
+      // Obtener el link de la base de datos
+      const linkResult = await linkModel.getLinkById({ user: userId, id: linkId }) as LinkFields
+
+      if ('error' in linkResult) {
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Link no encontrado' })
+      }
+
+      // Obtener las keys de las imágenes (guardadas en el campo images del link)
+      const imageKeys = linkResult.images ?? []
+
+      if (imageKeys.length === 0) {
+        return res.status(200).json({
+          ...constants.API_SUCCESS_RESPONSE,
+          data: []
+        })
+      }
+
+      // Generar URLs firmadas para cada imagen
+      const signedImagesPromises = imageKeys.map(async (key: string) => {
+        try {
+          // Verificar que la key pertenece al usuario
+          if (!key.startsWith(`${email}/`)) {
+            console.warn(`Imagen ${key} no pertenece al usuario ${email}`)
+            return null
+          }
+
+          // Generar URL firmada
+          const signedUrl = await storageControllerNew.getSignedReadUrl(key, 3600) // 1 hora de expiración
+
+          return {
+            key,
+            url: signedUrl,
+            fileName: key.split('/').pop() ?? key
+          }
+        } catch (error) {
+          console.error(`Error al generar URL firmada para ${key}:`, error)
+          return null
+        }
+      })
+
+      const signedImages = (await Promise.all(signedImagesPromises)).filter(Boolean)
+
+      return res.status(200).json({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: signedImages
+      })
+    } catch (error) {
+      console.error('Error al obtener las imágenes del link:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al obtener las imágenes del link' })
+    }
+  }
+
+  /**
+   * Obtener URLs firmadas para múltiples links (bulk operation)
+   * Útil cuando cargas varios links a la vez
+   */
+  static async getBulkLinkImages (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
+    const userId = req.user?._id
+    const { linkIds } = req.body // Array de IDs de links
+
+    if (email === undefined || email === null || email === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+    }
+
+    if (!Array.isArray(linkIds) || linkIds.length === 0) {
+      return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'Array de IDs de links requerido' })
+    }
+
+    try {
+      const linksImagesPromises = linkIds.map(async (linkId: string) => {
+        try {
+          const linkResult = await linkModel.getLinkById({ user: userId, id: linkId }) as LinkFields
+
+          if ('error' in linkResult) {
+            return { linkId, images: [] }
+          }
+
+          const imageKeys = linkResult.images ?? []
+
+          const signedImagesPromises = imageKeys.map(async (key: string) => {
+            try {
+              if (!key.startsWith(`${email}/`)) {
+                return null
+              }
+
+              const signedUrl = await storageControllerNew.getSignedReadUrl(key, 3600)
+
+              return {
+                key,
+                url: signedUrl,
+                fileName: key.split('/').pop() ?? key
+              }
+            } catch (error) {
+              console.error(`Error al generar URL firmada para ${key}:`, error)
+              return null
+            }
+          })
+
+          const signedImages = (await Promise.all(signedImagesPromises)).filter(Boolean)
+
+          return {
+            linkId,
+            images: signedImages
+          }
+        } catch (error) {
+          console.error(`Error al procesar link ${linkId}:`, error)
+          return { linkId, images: [] }
+        }
+      })
+
+      const linksImages = await Promise.all(linksImagesPromises)
+
+      return res.status(200).json({
+        ...constants.API_SUCCESS_RESPONSE,
+        data: linksImages
+      })
+    } catch (error) {
+      console.error('Error al obtener las imágenes de los links:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al obtener las imágenes de los links' })
     }
   }
 }

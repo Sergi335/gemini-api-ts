@@ -1,7 +1,8 @@
 import express from 'express'
 import multer from 'multer'
 import { z } from 'zod'
-import { storageController } from '../../controllers/storageController'
+// import { storageController } from '../../controllers/storageController'
+import { storageControllerNew } from '../../controllers/storageControllerNew'
 import limitStorage from '../../middlewares/limitStorage'
 import {
   deleteImageBodySchema,
@@ -14,42 +15,43 @@ const upload = multer()
 export const storageRouter = express.Router()
 
 // Rutas GET - no necesitan validación adicional
-storageRouter.get('/backgrounds', storageController.getBackgroundsMiniatures)
-storageRouter.get('/backgroundurl', storageController.getBackgroundUrl)
-storageRouter.get('/icons', storageController.getLinkIcons)
-storageRouter.get('/backup', storageController.getUserBackup)
+storageRouter.get('/backgrounds', storageControllerNew.getBackgroundsMiniatures)
+storageRouter.get('/backgroundurl', storageControllerNew.getBackgroundUrl)
+storageRouter.get('/icons', storageControllerNew.getLinkIcons)
+storageRouter.get('/backup', storageControllerNew.getUserBackup)
+storageRouter.get('/link/:linkId/images', storageControllerNew.getLinkImages)
 
 // Rutas POST - con validación de body cuando corresponde
-storageRouter.post('/backup', storageController.createUserBackup)
+storageRouter.post('/backup', storageControllerNew.createUserBackup)
 storageRouter.post('/restorebackup',
   upload.single('backup'),
-  storageController.restoreUserBackup
+  storageControllerNew.restoreUserBackup
 )
 storageRouter.post('/image',
   upload.single('images'),
   limitStorage,
   validateBody(uploadImageBodySchema),
-  storageController.uploadImage
+  storageControllerNew.uploadImage
 )
 storageRouter.post('/icon',
   upload.single('linkImg'),
   limitStorage,
-  storageController.uploadIcon
+  storageControllerNew.uploadIcon
 )
 storageRouter.post('/profilepic',
   upload.single('file'),
   limitStorage,
-  storageController.uploadProfileImage
+  storageControllerNew.uploadProfileImage
 )
 
 // Rutas DELETE - con validación de body
 storageRouter.delete('/image',
   validateBody(deleteImageBodySchema),
-  storageController.deleteImage
+  storageControllerNew.deleteImage
 )
 storageRouter.delete('/icon',
   validateBody(z.object({
     image: z.string().min(1, 'Nombre de imagen requerido')
   })),
-  storageController.deleteIcon
+  storageControllerNew.deleteIcon
 )
