@@ -272,11 +272,12 @@ export class linkModel {
   }
 
   static async setLinkImgInDb ({ url, user, id }: ValidatedLinkData): Promise<{ message: string } | { error: any }> {
+    console.log('🚀 ~ linkModel ~ setLinkImgInDb ~ url:', url)
     if (typeof url !== 'string' || url.trim() === '') {
       return { error: 'URL inválida' }
     }
     const urlObj = new URL(url)
-    const dominio = 'firebasestorage.googleapis.com'
+    const dominio = 'zenmarks.f7f6c803413fe2e68bdebec937cceb89.r2.cloudflarestorage.com'
     const dominio2 = 't1.gstatic.com'
 
     const imagePath = (urlObj.hostname === dominio || urlObj.hostname === dominio2) ? url : urlObj.pathname

@@ -2,6 +2,7 @@ import { Response } from 'express'
 // Para Cloudflare R2, instalar: npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { categoryModel } from '../models/categoryModel'
 import { LinkFields, linkModel } from '../models/linkModel'
 import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
@@ -92,14 +93,14 @@ export class storageControllerNew {
   static async uploadImage (req: RequestWithUser, res: Response): Promise<Response> {
     const email = req.user?.email
     const id = req.user?._id
-    const linkId = req.body.linkId
+    const linkId = req.body?.linkId
 
     if (email === undefined || email === null || email === '') {
       return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     }
 
     if (req.file === undefined || req.file === null) {
-      return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No hemos recibido imagen' })
+      return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No hay archivo' })
     }
 
     try {
@@ -117,22 +118,9 @@ export class storageControllerNew {
 
       await r2Client.send(putCommand)
 
-      // Actualizar la cuota del usuario
-      const userResult = await userModel.getUser({ email })
-      if ('error' in userResult) {
-        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'Usuario no encontrado' })
-      }
-      const quota = userResult.quota ?? 0
-      const newQuota = quota + file.size
-      if (newQuota > Number(process.env.MAX_USER_QUOTA) && email !== process.env.SUPERUSER_EMAIL) {
-        await r2Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }))
-        return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
-      }
-      await userModel.editUser({ email, fields: { quota: newQuota } })
-
-      // IMPORTANTE: Guardar en la base de datos
+      // Guardar en la base de datos
       try {
-      // Guardar la KEY en la base de datos, no la URL firmada
+        // Guardar la KEY en la base de datos, no la URL firmada
         const resultadoDb = await linkModel.setImagesInDb({ url: key, user: id, id: linkId })
 
         // Generar URL firmada para la respuesta
@@ -143,7 +131,7 @@ export class storageControllerNew {
           data: { ...resultadoDb, signedUrl }
         })
       } catch (error) {
-      // Si falla guardar en DB, eliminar el archivo de R2
+        // Si falla guardar en DB, eliminar el archivo de R2
         await r2Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }))
         return res.status(500).json({
           ...constants.API_FAIL_RESPONSE,
@@ -220,7 +208,7 @@ export class storageControllerNew {
     const file = req.file
     const user = req.user?.email
     const userId = req.user?._id
-    const linkId = req.body.linkId
+    const linkId = req.body?.linkId
 
     if (user === undefined || user === null || user === '') {
       return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
@@ -254,7 +242,7 @@ export class storageControllerNew {
       const signedUrl = await storageControllerNew.getSignedReadUrl(key)
 
       try {
-        await linkModel.setLinkImgInDb({ url: key, user: userId, id: linkId })
+        await linkModel.setLinkImgInDb({ url: signedUrl, user: userId, id: linkId })
         return res.status(200).json({
           ...constants.API_SUCCESS_RESPONSE,
           data: {
@@ -399,26 +387,24 @@ export class storageControllerNew {
   }
 
   static async createUserBackup (req: RequestWithUser, res: Response): Promise<Response> {
+    const user = req.user?._id
     const email = req.user?.email
 
+    if (user === undefined || user === null || user === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+    }
     if (email === undefined || email === null || email === '') {
       return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     }
 
     try {
-      // TODO: Implementar cuando estén disponibles los modelos necesarios
-      return res.status(501).send({ error: 'Funcionalidad no implementada - faltan modelos desktopModel y columnModel' })
-
-      /*
-      // Ejemplo de implementación cuando estén los modelos:
-      const data1 = await desktopModel.getAllDesktops({ user })
-      const data2 = await columnModel.getAllColumns({ user })
-      const data3 = await linkModel.getAllLinks({ user })
+      const data1 = await linkModel.getAllLinks({ user })
+      const data2 = await categoryModel.getAllCategories({ user })
+      // const data3 = await linkModel.getAllLinks({ user: email })
 
       const backupData = {
-        escritorios: data1,
-        columnas: data2,
-        links: data3
+        categories: data2,
+        links: data1
       }
 
       const fileName = `${email}dataBackup.json`
@@ -436,9 +422,8 @@ export class storageControllerNew {
 
       return res.status(200).json({
         ...constants.API_SUCCESS_RESPONSE,
-        data: { url: signedUrl, key: key }
+        data: { url: signedUrl, key }
       })
-      */
     } catch (error) {
       const mensaje = 'Error al crear la copia de seguridad'
       console.error('Error al crear la copia de seguridad:', error)
@@ -491,6 +476,7 @@ export class storageControllerNew {
 
   static async uploadProfileImage (req: RequestWithUser, res: Response): Promise<Response> {
     const email = req.user?.email
+    const superUserEmail = process.env.SUPERUSER_EMAIL
 
     if (email === undefined || email === null || email === '') {
       return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
@@ -556,18 +542,20 @@ export class storageControllerNew {
 
       const quota = userResult.quota
 
-      if (quota === undefined) {
-        const newQuota = Number(newSize)
-        if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
-          return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
+      if (email !== superUserEmail) {
+        if (quota === undefined) {
+          const newQuota = Number(newSize)
+          if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
+            return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
+          }
+          await userModel.editUser({ email, fields: { quota: newQuota } })
+        } else {
+          const newQuota = Number(quota) + Number(difference)
+          if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
+            return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
+          }
+          await userModel.editUser({ email, fields: { quota: newQuota } })
         }
-        await userModel.editUser({ email, fields: { quota: newQuota } })
-      } else {
-        const newQuota = Number(quota) + Number(difference)
-        if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
-          return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
-        }
-        await userModel.editUser({ email, fields: { quota: newQuota } })
       }
 
       // Generar URL firmada para la imagen
