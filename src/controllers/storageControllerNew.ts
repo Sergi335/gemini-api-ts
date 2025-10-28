@@ -59,23 +59,23 @@ export class storageControllerNew {
       const response = await r2Client.send(listCommand)
       const objects = response.Contents ?? []
 
-      console.log('🔍 Objetos encontrados en miniatures/:', objects.length)
-      objects.forEach((obj: any) => {
-        console.log('  - Key:', obj.Key, '| Size:', obj.Size)
-      })
+      // console.log('🔍 Objetos encontrados en miniatures/:', objects.length)
+      // objects.forEach((obj: any) => {
+      //   console.log('  - Key:', obj.Key, '| Size:', obj.Size)
+      // })
 
       const backgroundsPromises = objects.map(async (obj: any) => {
         if ((obj.Key as string) === null || (obj.Key as string) === undefined || (obj.Key as string) === '') return null
 
         // Ignorar carpetas (terminan en / o tienen tamaño 0)
         if ((obj.Key as string).endsWith('/') || obj.Size === 0) {
-          console.log('⏭️  Ignorando carpeta o archivo vacío:', obj.Key)
+          // console.log('⏭️  Ignorando carpeta o archivo vacío:', obj.Key)
           return null
         }
 
         // FIX: Usar storageControllerNew en lugar de this
         const signedUrl = await storageControllerNew.getSignedReadUrl(obj.Key as string)
-        console.log('✅ URL generada para:', obj.Key)
+        // console.log('✅ URL generada para:', obj.Key)
         return {
           url: signedUrl,
           nombre: (obj.Key as string).split('/').pop() ?? (obj.Key as string)
@@ -133,6 +133,7 @@ export class storageControllerNew {
       } catch (error) {
         // Si falla guardar en DB, eliminar el archivo de R2
         await r2Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }))
+        console.error(error)
         return res.status(500).json({
           ...constants.API_FAIL_RESPONSE,
           error: 'Error al guardar la imagen en la base de datos'
