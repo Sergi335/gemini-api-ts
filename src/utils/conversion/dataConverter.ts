@@ -1,6 +1,6 @@
 import fs from 'fs'
-import path from 'path'
 import { ObjectId } from 'mongodb'
+import path from 'path'
 
 // Tipos para el formato antiguo
 interface OldCategory {
@@ -33,6 +33,7 @@ interface NewCategory {
   _id: string
   name: string
   parentId?: string
+  parentSlug?: string
   user: string
   order: number
   level: number
@@ -64,6 +65,7 @@ export class DataConverter {
   private readonly user: string
   private readonly categoryIdMap: Map<string, string> = new Map()
   private readonly desktopIdMap: Map<string, string> = new Map()
+  private readonly desktopSlugMap: Map<string, string> = new Map()
   private readonly slugUsage: Map<string, number> = new Map()
 
   constructor (user: string = 'SergioSR') {
@@ -147,27 +149,31 @@ export class DataConverter {
     for (const escritorio of data.escritorios) {
       const desktopId = new ObjectId().toString()
       const desktopName = escritorio.displayName ?? escritorio.name
+      const desktopSlug = this.generateSlug(desktopName)
       const desktopCategory: NewCategory = {
         _id: desktopId,
         name: desktopName,
         user: this.user,
         order: escritorio.orden ?? categoryOrder++,
         level: 0,
-        slug: this.generateSlug(desktopName)
+        slug: desktopSlug
       }
       newCategories.push(desktopCategory)
       this.desktopIdMap.set(escritorio.name, desktopId)
+      this.desktopSlugMap.set(escritorio.name, desktopSlug)
     }
 
     // Segundo, crear subcategorías basadas en las columnas
     for (const columna of data.columnas) {
       const parentDesktopId = this.desktopIdMap.get(columna.escritorio)
+      const parentSlug = this.desktopSlugMap.get(columna.escritorio)
       if (parentDesktopId != null) {
         const categoryId = new ObjectId().toString()
         const newCategory: NewCategory = {
           _id: categoryId,
           name: columna.name,
           parentId: parentDesktopId,
+          parentSlug,
           user: this.user,
           order: columna.order ?? 0,
           level: 1,
@@ -234,16 +240,18 @@ export class DataConverter {
     for (const [desktopName, categories] of desktopGroups) {
       // Crear escritorio como categoría padre
       const desktopId = new ObjectId().toString()
+      const desktopSlug = this.generateSlug(desktopName)
       const desktopCategory: NewCategory = {
         _id: desktopId,
         name: desktopName,
         user: this.user,
         order: categoryOrder++,
         level: 0,
-        slug: this.generateSlug(desktopName)
+        slug: desktopSlug
       }
       newCategories.push(desktopCategory)
       this.desktopIdMap.set(desktopName, desktopId)
+      this.desktopSlugMap.set(desktopName, desktopSlug)
 
       // Crear subcategorías
       for (const category of categories) {
@@ -252,6 +260,7 @@ export class DataConverter {
           _id: categoryId,
           name: category.name,
           parentId: desktopId,
+          parentSlug: desktopSlug,
           user: this.user,
           order: category.order ?? 0,
           level: 1,
@@ -281,16 +290,36 @@ export class DataConverter {
    * Convierte formato directo (ya tiene estructura jerárquica)
    */
   private convertDirectFormat (data: any): ConvertedData {
+    // Crear mapa de categorías para buscar parentSlug
+    const categoryMap = new Map<string, any>()
+    for (const cat of data.categories) {
+      categoryMap.set(cat._id, cat)
+    }
+
     // Si ya tiene el formato correcto, solo validar y limpiar
-    const newCategories = data.categories.map((cat: any) => ({
-      _id: cat._id ?? new ObjectId().toString(),
-      name: cat.name,
-      parentId: cat.parentId ?? cat.parentCategory,
-      user: cat.user ?? this.user,
-      order: cat.order ?? 0,
-      level: cat.level ?? 0,
-      slug: cat.slug ?? this.generateSlug(cat.name)
-    }))
+    const newCategories = data.categories.map((cat: any) => {
+      const parentId = cat.parentId ?? cat.parentCategory
+      let parentSlug = cat.parentSlug
+
+      // Si tiene parentId pero no parentSlug, buscarlo
+      if (parentId != null && parentSlug == null) {
+        const parentCat = categoryMap.get(parentId)
+        if (parentCat != null) {
+          parentSlug = parentCat.slug ?? this.generateSlug(parentCat.name)
+        }
+      }
+
+      return {
+        _id: cat._id ?? new ObjectId().toString(),
+        name: cat.name,
+        parentId,
+        ...(parentSlug != null && { parentSlug }),
+        user: cat.user ?? this.user,
+        order: cat.order ?? 0,
+        level: cat.level ?? 0,
+        slug: cat.slug ?? this.generateSlug(cat.name)
+      }
+    })
 
     const newLinks = data.links.map((link: any) => this.convertLink(link, link.categoryId, link.order ?? 0))
 
@@ -353,7 +382,8 @@ export class DataConverter {
 export async function runConversion (inputFile?: string, outputFile?: string, user?: string): Promise<void> {
   const converter = new DataConverter(user)
 
-  const defaultInputFile = path.join(__dirname, 'sergiadn335@gmail.comdataBackup.json')
+  // El archivo de entrada está en la carpeta data/, el de salida aquí mismo
+  const defaultInputFile = path.join(__dirname, '..', 'data', 'sergiadn335@gmail.comdataBackup.json')
   const defaultOutputFile = path.join(__dirname, 'convertedData.json')
 
   const input = inputFile ?? defaultInputFile

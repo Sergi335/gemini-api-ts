@@ -9,13 +9,44 @@ utils/
 ├── conversion/      # Conversión y transformación de datos
 ├── data/            # Datos de ejemplo y backups
 ├── import/          # Importación de datos a MongoDB
-├── migration/       # Migraciones de base de datos
+├── migration/       # Migraciones de base de datos (solo datos existentes)
 │   ├── checks/      # Verificación de estado de migraciones
 │   └── rollback/    # Rollback de migraciones
 ├── r2/              # Utilidades de Cloudflare R2
 ├── constants.ts     # Constantes globales
 ├── linksUtils.ts    # Utilidades para manejo de links
 └── linksUtils.test.ts
+```
+
+---
+
+## 🚀 Flujo de Migración Recomendado
+
+### Para datos nuevos (desde Firebase/backup)
+
+El `dataConverter` ya genera los datos en formato completo con `parentId`, `parentSlug` y `slug`. **No necesitas migraciones adicionales.**
+
+```bash
+# 1. Colocar backup en data/
+# 2. Convertir (genera parentId, parentSlug, slug automáticamente)
+npm run convert-data
+
+# 3. Importar a MongoDB
+npm run import-data
+```
+
+### Para datos existentes en MongoDB (formato antiguo)
+
+Solo si tienes datos en la base de datos con el formato antiguo:
+
+```bash
+# 1. Verificar estado
+npm run check-migration-status
+npm run migrate-parent-slug:check
+
+# 2. Ejecutar migraciones si es necesario
+npm run migrate-parent-category    # parentCategory → parentId
+npm run migrate-parent-slug        # Añadir parentSlug
 ```
 
 ---
@@ -111,24 +142,31 @@ Utilidades para Cloudflare R2 (almacenamiento S3-compatible).
 
 ## 🚀 Uso Común
 
-### Convertir datos de Firebase
+### Convertir e importar datos de Firebase
 ```bash
-npx ts-node src/utils/conversion/convertData.ts
+# 1. Colocar backup en: src/utils/data/sergiadn335@gmail.comdataBackup.json
+
+# 2. Convertir (genera parentId, parentSlug, slug)
+npm run convert-data
+
+# 3. Importar a MongoDB
+npm run import-data                    # Omite duplicados
+npm run import-data-overwrite          # Sobrescribe todo
 ```
 
-### Importar datos a MongoDB
+### Migraciones (solo para datos existentes en formato antiguo)
 ```bash
-npx ts-node src/utils/import/dataImporter.ts
-```
+# Verificar estado
+npm run check-migration-status
+npm run migrate-parent-slug:check
 
-### Ejecutar migraciones
-```bash
-npx ts-node src/utils/migration/migrateParentSlug.ts
-```
+# Ejecutar si es necesario
+npm run migrate-parent-category
+npm run migrate-parent-slug
 
-### Verificar estado de migración
-```bash
-npx ts-node src/utils/migration/checks/checkMigrationStatus.ts
+# Rollback si algo falla
+npm run rollback-parent-category
+npm run migrate-parent-slug:rollback
 ```
 
 ### Listar buckets de R2
