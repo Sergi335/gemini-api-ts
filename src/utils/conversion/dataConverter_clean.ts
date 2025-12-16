@@ -1,6 +1,6 @@
 import fs from 'fs'
-import path from 'path'
 import { ObjectId } from 'mongodb'
+import path from 'path'
 
 // Tipos para el formato antiguo
 interface OldCategory {
@@ -287,13 +287,13 @@ export class DataConverter {
 
       fs.writeFileSync(outputPath, JSON.stringify(convertedData, null, 2))
       console.log(`✅ Conversión completada: ${inputPath} -> ${outputPath}`)
-      console.log(`📊 Estadísticas:`)
+      console.log('📊 Estadísticas:')
       console.log(`   - Categorías: ${convertedData.categories.length}`)
       console.log(`   - Links: ${convertedData.links.length}`)
 
       // Mostrar estructura de categorías
       const topLevelCategories = convertedData.categories.filter(c => c.level === 0)
-      console.log(`📁 Estructura de categorías:`)
+      console.log('📁 Estructura de categorías:')
       for (const topCategory of topLevelCategories) {
         console.log(`   📂 ${topCategory.name}`)
         const subCategories = convertedData.categories.filter(c => c.parentCategory === topCategory._id)
@@ -321,7 +321,7 @@ export async function runConversion (inputFile?: string, outputFile?: string, us
   if (!fs.existsSync(input)) {
     console.error(`❌ Archivo de entrada no encontrado: ${input}`)
     console.log(`💡 Crea un archivo con tus datos antiguos en: ${input}`)
-    console.log(`📝 O usa: runConversion('ruta/a/tu/archivo.json')`)
+    console.log('📝 O usa: runConversion(\'ruta/a/tu/archivo.json\')')
     return
   }
 
