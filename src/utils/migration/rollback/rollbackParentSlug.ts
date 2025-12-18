@@ -1,4 +1,4 @@
-import { rollbackParentSlug } from './migrateParentSlug'
+import { rollbackParentSlug } from '../migrateParentSlug'
 
 rollbackParentSlug()
   .then(() => {
