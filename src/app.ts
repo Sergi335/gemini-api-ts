@@ -13,6 +13,9 @@ import { storageRouter } from './routes/storage/storage'
 
 const app = express()
 
+// Trust proxy - necesario para cookies secure en Render/Heroku/etc
+app.set('trust proxy', 1)
+
 // Middleware
 app.use(
   helmet({
