@@ -6,7 +6,7 @@ import users from './schemas/userSchema'
 // import { createRequire } from 'node:module'
 // const customRequire = createRequire(import.meta.url)
 // const dummyData = customRequire('../utils/dummyData.json')
-import dummyData from '../utils/dummyData.json'
+import dummyData from '../utils/data/dummyData.json'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class userModel {
