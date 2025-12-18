@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'
 import { connect, disconnect } from 'mongoose'
-import categoryModel from '../models/schemas/categorySchema'
+import categoryModel from '../../models/schemas/categorySchema'
 
 // Cargar variables de entorno una sola vez
 dotenv.config()
