@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=test ts-node-dev src/server.ts",
     "production": "cross-env NODE_ENV=production ts-node-dev src/server.ts",
-    "tsc": "tsc",
+    "build": "tsc",
     "start": "node dist/server.js",
     "lint": "ts-standard",
     "lint:fix": "ts-standard --fix",
