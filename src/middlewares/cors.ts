@@ -1,6 +1,9 @@
-import { Request, Response, NextFunction } from 'express'
+import { NextFunction, Request, Response } from 'express'
 
-const ACCEPTED_ORIGINS = ['http://localhost:5173'] // Example origins
+const ACCEPTED_ORIGINS = [
+  'http://localhost:5173',
+  'https://zenmarks.vercel.app'
+]
 
 const cors = (req: Request, res: Response, next: NextFunction): void => {
   const origin = req.headers.origin
