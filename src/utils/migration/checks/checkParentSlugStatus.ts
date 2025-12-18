@@ -1,4 +1,4 @@
-import { checkParentSlugStatus } from './migrateParentSlug'
+import { checkParentSlugStatus } from '../migrateParentSlug'
 
 checkParentSlugStatus()
   .then(() => {
