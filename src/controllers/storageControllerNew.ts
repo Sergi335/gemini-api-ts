@@ -651,6 +651,8 @@ export class storageControllerNew {
    */
   static async getSignedFileUrl (req: RequestWithUser, res: Response): Promise<Response> {
     const email = req.user?.email
+    console.log(req.body)
+
     const { key, expiresIn = 3600 } = req.body
 
     if (email === undefined || email === null || email === '') {

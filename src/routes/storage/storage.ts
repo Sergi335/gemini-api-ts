@@ -43,7 +43,7 @@ storageRouter.post('/profilepic',
   limitStorage,
   storageControllerNew.uploadProfileImage
 )
-
+storageRouter.post('/signed-url', storageControllerNew.getSignedFileUrl)
 // Rutas DELETE - con validación de body
 storageRouter.delete('/image',
   validateBody(deleteImageBodySchema),
