@@ -11,12 +11,17 @@ const MAX_USER_QUOTA = typeof process.env.MAX_USER_QUOTA === 'string' && process
 const limitStorage = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
   const userEmail = req.user?.email
   const file = req?.file
+  console.log(req.path, req.method, 'limitStorage middleware called')
 
   if (userEmail === null || userEmail === '' || userEmail === undefined) {
     res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
     return
   }
   if (file === null || file === undefined) {
+    if (req.path === '/icon' && req.method === 'POST') {
+      next()
+      return
+    }
     res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: 'No hay archivo' })
     return
   }
