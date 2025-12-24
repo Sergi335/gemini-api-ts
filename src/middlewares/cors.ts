@@ -2,7 +2,8 @@ import { NextFunction, Request, Response } from 'express'
 
 const ACCEPTED_ORIGINS = [
   'http://localhost:5173',
-  'https://zenmarks.vercel.app'
+  'https://zenmarks.vercel.app',
+  'https://zenmarks-api.onrender.com' // Añadir si es necesario
 ]
 
 const cors = (req: Request, res: Response, next: NextFunction): void => {
