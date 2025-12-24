@@ -1,31 +1,72 @@
-import * as cheerio from 'cheerio'
 import axios from 'axios'
-import https from 'node:https'
+import * as cheerio from 'cheerio'
 import crypto from 'node:crypto'
+import https from 'node:https'
+
+// Agente HTTPS que permite conexiones legacy y ignora errores de certificados en producción
+const httpsAgent = new https.Agent({
+  secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
+  rejectUnauthorized: false // Solo para scraping, no usar en peticiones sensibles
+})
+
+// Headers que simulan un navegador real
+const browserHeaders = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'no-cache',
+  Pragma: 'no-cache'
+}
 
 export const getLinkNameByUrlLocal = async ({ url }: { url: string }): Promise<string> => {
   try {
-    const response = await axios.get(url)
+    const response = await axios.get(url, {
+      headers: browserHeaders,
+      httpsAgent,
+      timeout: 10000, // 10 segundos de timeout
+      maxRedirects: 5,
+      validateStatus: (status) => status < 500 // Aceptar respuestas 2xx, 3xx y 4xx
+    })
     const html = response.data
     const $ = cheerio.load(html)
-    const title = $('title').text()
+
+    // Intentar obtener el título de múltiples fuentes
+    let title = $('title').text().trim()
+
+    // Si no hay título, intentar con og:title
+    if (title === '' || title === undefined) {
+      title = $('meta[property="og:title"]').attr('content') ?? ''
+    }
+
+    // Si aún no hay título, intentar con twitter:title
+    if (title === '' || title === undefined) {
+      title = $('meta[name="twitter:title"]').attr('content') ?? ''
+    }
+
+    // Si no se encontró ningún título, usar el hostname
+    if (title === '' || title === undefined) {
+      title = new URL(url).hostname
+    }
+
     console.log('El título de la página es: ' + title)
     return title
   } catch (error) {
-    const altTitle = new URL(url).host
-    console.log('Hubo un error al obtener el título de la página:', error)
-    return altTitle // Lanzar el error para manejarlo en la función llamante
+    const altTitle = new URL(url).hostname
+    console.error('Error al obtener el título de la página:', (error as Error).message)
+    return altTitle
   }
 }
 export const getLinkStatusLocal = async ({ url }: { url: string }): Promise<{ status: string }> => {
-  const agentOptions = {
-    secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT
-  }
-  const agent = new https.Agent(agentOptions)
   try {
-  // Realizar la solicitud HTTP con Axios
-    const response = await axios.get(url, { httpsAgent: agent })
-    // const response = await fetch(url, { mode: 'no-cors' })
+    // Realizar la solicitud HTTP con Axios usando los headers de navegador
+    const response = await axios.get(url, {
+      headers: browserHeaders,
+      httpsAgent,
+      timeout: 10000,
+      maxRedirects: 5,
+      validateStatus: () => true // Aceptar cualquier código de estado
+    })
     const statusCode = response.status
 
     let status
