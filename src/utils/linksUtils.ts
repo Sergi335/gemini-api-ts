@@ -20,7 +20,10 @@ const browserHeaders = {
 }
 
 export const getLinkNameByUrlLocal = async ({ url }: { url: string }): Promise<string> => {
+  console.log('🔍 [getLinkNameByUrlLocal] Iniciando petición para:', url)
   try {
+    console.log('🌐 [getLinkNameByUrlLocal] Enviando request con headers:', JSON.stringify(browserHeaders, null, 2))
+
     const response = await axios.get(url, {
       headers: browserHeaders,
       httpsAgent,
@@ -28,32 +31,61 @@ export const getLinkNameByUrlLocal = async ({ url }: { url: string }): Promise<s
       maxRedirects: 5,
       validateStatus: (status) => status < 500 // Aceptar respuestas 2xx, 3xx y 4xx
     })
+
+    console.log('✅ [getLinkNameByUrlLocal] Respuesta recibida:', {
+      status: response.status,
+      statusText: response.statusText,
+      contentType: response.headers['content-type'],
+      dataLength: typeof response.data === 'string' ? response.data.length : 'no es string'
+    })
+
     const html = response.data
+
+    if (typeof html !== 'string') {
+      console.log('⚠️ [getLinkNameByUrlLocal] La respuesta no es un string:', typeof html)
+      return new URL(url).hostname
+    }
+
+    console.log('📄 [getLinkNameByUrlLocal] Primeros 500 caracteres del HTML:', html.substring(0, 500))
+
     const $ = cheerio.load(html)
 
     // Intentar obtener el título de múltiples fuentes
     let title = $('title').text().trim()
+    console.log('🏷️ [getLinkNameByUrlLocal] Título encontrado en <title>:', title || '(vacío)')
 
     // Si no hay título, intentar con og:title
     if (title === '' || title === undefined) {
       title = $('meta[property="og:title"]').attr('content') ?? ''
+      console.log('🏷️ [getLinkNameByUrlLocal] Título encontrado en og:title:', title || '(vacío)')
     }
 
     // Si aún no hay título, intentar con twitter:title
     if (title === '' || title === undefined) {
       title = $('meta[name="twitter:title"]').attr('content') ?? ''
+      console.log('🏷️ [getLinkNameByUrlLocal] Título encontrado en twitter:title:', title || '(vacío)')
     }
 
     // Si no se encontró ningún título, usar el hostname
     if (title === '' || title === undefined) {
       title = new URL(url).hostname
+      console.log('🏷️ [getLinkNameByUrlLocal] Usando hostname como fallback:', title)
     }
 
-    console.log('El título de la página es: ' + title)
+    console.log('✅ [getLinkNameByUrlLocal] Título final:', title)
     return title
   } catch (error) {
+    const axiosError = error as any
+    console.error('❌ [getLinkNameByUrlLocal] Error capturado:', {
+      message: axiosError.message,
+      code: axiosError.code,
+      status: axiosError.response?.status,
+      statusText: axiosError.response?.statusText,
+      responseData: axiosError.response?.data?.substring?.(0, 200) || axiosError.response?.data
+    })
+
     const altTitle = new URL(url).hostname
-    console.error('Error al obtener el título de la página:', (error as Error).message)
+    console.log('🔄 [getLinkNameByUrlLocal] Retornando hostname como fallback:', altTitle)
     return altTitle
   }
 }
