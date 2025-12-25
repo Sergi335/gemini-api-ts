@@ -19,8 +19,39 @@ const browserHeaders = {
   Pragma: 'no-cache'
 }
 
+// Función para obtener título de YouTube usando oEmbed API
+const getYouTubeTitle = async (url: string): Promise<string | null> => {
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+    const response = await axios.get(oembedUrl, { timeout: 5000 })
+    const data = response.data as { title?: string }
+    if (typeof data.title === 'string' && data.title !== '') {
+      console.log('🎬 [getYouTubeTitle] Título obtenido de oEmbed:', data.title)
+      return data.title
+    }
+    return null
+  } catch (error) {
+    console.log('⚠️ [getYouTubeTitle] Error obteniendo título de YouTube:', (error as Error).message)
+    return null
+  }
+}
+
+// Detectar si es una URL de YouTube
+const isYouTubeUrl = (url: string): boolean => {
+  return url.includes('youtube.com') || url.includes('youtu.be')
+}
+
 export const getLinkNameByUrlLocal = async ({ url }: { url: string }): Promise<string> => {
   console.log('🔍 [getLinkNameByUrlLocal] Iniciando petición para:', url)
+
+  // Para YouTube, usar la API oEmbed que es más fiable
+  if (isYouTubeUrl(url)) {
+    const youtubeTitle = await getYouTubeTitle(url)
+    if (youtubeTitle !== null) {
+      return youtubeTitle
+    }
+  }
+
   try {
     console.log('🌐 [getLinkNameByUrlLocal] Enviando request con headers:', JSON.stringify(browserHeaders, null, 2))
 
