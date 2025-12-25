@@ -59,15 +59,17 @@ export const getLinkNameByUrlLocal = async ({ url }: { url: string }): Promise<s
 
     // Priorizar og:title (más completo en sitios como YouTube, Twitter, etc.)
     // Luego twitter:title, y finalmente el <title> HTML
-    let title = ogTitle || twitterTitle || htmlTitle
+    let title = ogTitle !== '' ? ogTitle : (twitterTitle !== '' ? twitterTitle : htmlTitle)
 
     // Si el título es genérico o está incompleto, intentar extraer de JSON-LD
-    if (!title || title === '- YouTube' || title === 'YouTube') {
+    if (title === '' || title === '- YouTube' || title === 'YouTube') {
       const jsonLdScript = $('script[type="application/ld+json"]').first().html()
-      if (jsonLdScript) {
+      if (jsonLdScript !== null && jsonLdScript !== '') {
         try {
-          const jsonLd = JSON.parse(jsonLdScript)
-          title = jsonLd.name || jsonLd.headline || title
+          const jsonLd = JSON.parse(jsonLdScript) as { name?: string, headline?: string }
+          const jsonLdName = typeof jsonLd.name === 'string' ? jsonLd.name : ''
+          const jsonLdHeadline = typeof jsonLd.headline === 'string' ? jsonLd.headline : ''
+          title = jsonLdName !== '' ? jsonLdName : (jsonLdHeadline !== '' ? jsonLdHeadline : title)
           console.log('🏷️ [getLinkNameByUrlLocal] Título encontrado en JSON-LD:', title)
         } catch {
           console.log('⚠️ [getLinkNameByUrlLocal] Error parseando JSON-LD')
@@ -76,7 +78,7 @@ export const getLinkNameByUrlLocal = async ({ url }: { url: string }): Promise<s
     }
 
     // Si no se encontró ningún título válido, usar el hostname
-    if (!title || title === '' || title === undefined) {
+    if (title === '') {
       title = new URL(url).hostname
       console.log('🏷️ [getLinkNameByUrlLocal] Usando hostname como fallback:', title)
     }
@@ -84,13 +86,16 @@ export const getLinkNameByUrlLocal = async ({ url }: { url: string }): Promise<s
     console.log('✅ [getLinkNameByUrlLocal] Título final:', title)
     return title
   } catch (error) {
-    const axiosError = error as any
+    const axiosError = error as { message?: string, code?: string, response?: { status?: number, statusText?: string, data?: string } }
+    const responseData = typeof axiosError.response?.data === 'string'
+      ? axiosError.response.data.substring(0, 200)
+      : String(axiosError.response?.data ?? '')
     console.error('❌ [getLinkNameByUrlLocal] Error capturado:', {
-      message: axiosError.message,
-      code: axiosError.code,
+      message: axiosError.message ?? 'Unknown error',
+      code: axiosError.code ?? 'Unknown code',
       status: axiosError.response?.status,
       statusText: axiosError.response?.statusText,
-      responseData: axiosError.response?.data?.substring?.(0, 200) || axiosError.response?.data
+      responseData
     })
 
     const altTitle = new URL(url).hostname
