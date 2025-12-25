@@ -50,24 +50,33 @@ export const getLinkNameByUrlLocal = async ({ url }: { url: string }): Promise<s
 
     const $ = cheerio.load(html)
 
-    // Intentar obtener el título de múltiples fuentes
-    let title = $('title').text().trim()
-    console.log('🏷️ [getLinkNameByUrlLocal] Título encontrado en <title>:', title || '(vacío)')
+    // Intentar obtener el título de múltiples fuentes (priorizando og:title para sitios como YouTube)
+    const ogTitle = $('meta[property="og:title"]').attr('content')?.trim() ?? ''
+    const twitterTitle = $('meta[name="twitter:title"]').attr('content')?.trim() ?? ''
+    const htmlTitle = $('title').text().trim()
 
-    // Si no hay título, intentar con og:title
-    if (title === '' || title === undefined) {
-      title = $('meta[property="og:title"]').attr('content') ?? ''
-      console.log('🏷️ [getLinkNameByUrlLocal] Título encontrado en og:title:', title || '(vacío)')
+    console.log('🏷️ [getLinkNameByUrlLocal] Títulos encontrados:', { ogTitle, twitterTitle, htmlTitle })
+
+    // Priorizar og:title (más completo en sitios como YouTube, Twitter, etc.)
+    // Luego twitter:title, y finalmente el <title> HTML
+    let title = ogTitle || twitterTitle || htmlTitle
+
+    // Si el título es genérico o está incompleto, intentar extraer de JSON-LD
+    if (!title || title === '- YouTube' || title === 'YouTube') {
+      const jsonLdScript = $('script[type="application/ld+json"]').first().html()
+      if (jsonLdScript) {
+        try {
+          const jsonLd = JSON.parse(jsonLdScript)
+          title = jsonLd.name || jsonLd.headline || title
+          console.log('🏷️ [getLinkNameByUrlLocal] Título encontrado en JSON-LD:', title)
+        } catch {
+          console.log('⚠️ [getLinkNameByUrlLocal] Error parseando JSON-LD')
+        }
+      }
     }
 
-    // Si aún no hay título, intentar con twitter:title
-    if (title === '' || title === undefined) {
-      title = $('meta[name="twitter:title"]').attr('content') ?? ''
-      console.log('🏷️ [getLinkNameByUrlLocal] Título encontrado en twitter:title:', title || '(vacío)')
-    }
-
-    // Si no se encontró ningún título, usar el hostname
-    if (title === '' || title === undefined) {
+    // Si no se encontró ningún título válido, usar el hostname
+    if (!title || title === '' || title === undefined) {
       title = new URL(url).hostname
       console.log('🏷️ [getLinkNameByUrlLocal] Usando hostname como fallback:', title)
     }
