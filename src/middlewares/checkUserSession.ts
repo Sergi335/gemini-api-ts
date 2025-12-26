@@ -6,14 +6,10 @@ import { RequestWithUser } from '../types/express'
 export const checkUserSession = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
   const sessionCookie = req.cookies?.session ?? undefined
 
-  // const logMessage = `Petición ${Date.now()}, url: ${req.baseUrl}, method: ${req.method}, cookies: ${String(sessionCookie?.length)}}`
+  // CSRF ya validado por doubleCsrfProtection en app.ts
+
   if (sessionCookie === undefined) {
-    res.status(401).send({ error: 'NOT COOKIE!' })
-    return
-  }
-  const csrfToken = req.headers['x-csrf-token'] as string | undefined
-  if (csrfToken !== req.cookies.csrfToken) {
-    res.status(401).send({ message: 'NO COINCIDE UNAUTHORIZED REQUEST!' })
+    res.status(401).send({ error: 'No hay cookie de sesión' })
     return
   }
 

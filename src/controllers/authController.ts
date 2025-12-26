@@ -1,5 +1,5 @@
-import { getAuth } from 'firebase-admin/auth'
 import { Request, Response } from 'express'
+import { getAuth } from 'firebase-admin/auth'
 import { userModel } from '../models/userModel'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
@@ -8,9 +8,9 @@ export class authController {
   static async googleLogin (req: Request, res: Response): Promise<void> {
     if (req.body.email !== undefined && req.body.email !== null && req.body.email !== '') {
       const user = await userModel.getUser({ email: req.body.email }) // Solo está sergiadn335@gmail.com
-      console.log(user)
+      // console.log(user)
       if (!('error' in user) && user._id !== undefined && user._id !== null) {
-        res.send(user)
+        res.send({ ...user, csrfToken: res.locals.csrfToken ?? '' })
       } else {
         const googleUser = await getAuth().getUser(req.body.uid)
         const nickname = googleUser.displayName ?? `user${Math.floor(Math.random() * 10000000000)}`

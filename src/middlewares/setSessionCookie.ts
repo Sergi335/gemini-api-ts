@@ -1,48 +1,48 @@
-import { Request, Response, NextFunction } from 'express'
+
+import { NextFunction, Request, Response } from 'express'
 import { getAuth } from 'firebase-admin/auth'
+import { generateCsrfToken } from './csrf'
 
 export const setSessionCookie = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    if (
-      typeof req.body.idToken !== 'string' ||
-      req.body.idToken.trim() === '' ||
-      typeof req.body.csrfToken !== 'string' ||
-      req.body.csrfToken.trim() === ''
-    ) {
-      res.status(400).send({ error: 'BAD REQUEST! FALTAN DATOS' })
+    const idToken = req.body.idToken
+
+    console.log('[setSessionCookie] idToken recibido:', idToken)
+    console.log('[setSessionCookie] Cookies recibidas:', req.cookies)
+    console.log('[setSessionCookie] Headers recibidos:', req.headers)
+
+    if (typeof idToken !== 'string' || idToken.trim() === '') {
+      console.log('[setSessionCookie] idToken inválido')
+      res.status(400).send({ error: 'idToken es requerido' })
       return
     }
-    const idToken = req.body.idToken.toString()
-    const csrfToken = req.body.csrfToken.toString()
-    console.log('🚀 ~ sessionCookieMiddleware ~ csrfToken:', csrfToken)
-    console.log('🚀 ~ sessionCookieMiddleware ~ idToken:', req.cookies.csrfToken)
-    // Guard against CSRF attacks.
-    if (csrfToken !== req.cookies.csrfToken) {
-      res.status(401).send({ message: 'NO COINCIDE UNAUTHORIZED REQUEST! setSessionCookie' })
-      return
+
+    // CSRF ya validado por doubleCsrfProtection en app.ts
+
+    const expiresIn = 60 * 60 * 24 * 5 * 1000 // 5 días
+    const isProduction = process.env.NODE_ENV === 'production'
+
+    const sessionCookie = await getAuth().createSessionCookie(idToken, { expiresIn })
+
+    const options = {
+      maxAge: expiresIn,
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' as const : 'lax' as const
     }
-    // Set session expiration to 5 days.
-    const expiresIn = 60 * 60 * 24 * 5 * 1000
-    // Create the session cookie. This will also verify the ID token in the process.
-    // The session cookie will have the same claims as the ID token.
-    // To only allow session cookie setting on recent sign-in, auth_time in ID token
-    // can be checked to ensure user was recently signed in before creating a session cookie.
-    getAuth()
-      .createSessionCookie(idToken, { expiresIn })
-      .then(
-        (sessionCookie) => {
-          // Set cookie policy for session cookie.
-          const options = { maxAge: expiresIn, httpOnly: true, secure: true, sameSite: 'none' as const }
-          console.log('Cookie creada con éxito')
-          res.cookie('session', sessionCookie, options)
-          next()
-        },
-        (error) => {
-          console.log(error)
-          res.status(401).send('UNAUTHORIZED REQUEST!')
-        }
-      )
+
+    res.cookie('session', sessionCookie, options)
+    console.log('[setSessionCookie] Cookie de sesión creada:', sessionCookie)
+    console.log('[setSessionCookie] Opciones de cookie:', options)
+
+    // Regenerar el token CSRF tras login
+    const newCsrfToken = generateCsrfToken(req, res, { overwrite: true })
+    console.log('[setSessionCookie] Nuevo CSRF token generado tras login:', newCsrfToken)
+    res.locals.csrfToken = newCsrfToken
+
+    next()
   } catch (error) {
-    res.send({ error: 'ERROR INEXPLICABLE' })
+    console.error('[setSessionCookie] Error:', error)
+    res.status(401).send({ error: 'Token inválido o expirado' })
   }
 }

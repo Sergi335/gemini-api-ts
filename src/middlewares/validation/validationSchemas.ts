@@ -89,7 +89,6 @@ export const loginBodySchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').optional(),
   idToken: z.string().optional(),
-  csrfToken: z.string().optional(),
   uid: z.string().optional()
 })
 
