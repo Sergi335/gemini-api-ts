@@ -14,6 +14,11 @@ const LinkSchema = new Schema({
   imgUrl: {
     type: String
   },
+  type: {
+    type: String,
+    enum: ['video', 'article', 'general'],
+    default: 'general'
+  },
   categoryName: {
     type: String
   },

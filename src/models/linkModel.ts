@@ -10,6 +10,7 @@ export interface LinkFields {
   description?: string
   url?: string
   imgUrl?: string
+  type?: 'video' | 'article' | 'general'
   categoryName?: string
   categoryId?: string
   notes?: string

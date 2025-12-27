@@ -3,6 +3,7 @@ import { Response } from 'express'
 import { JSDOM } from 'jsdom'
 import mongoose from 'mongoose'
 import { LinkFields, linkModel } from '../models/linkModel'
+import { LinkAnalyzer } from '../services/linkAnalyzer'
 import { RequestWithUser } from '../types/express'
 import { constants } from '../utils/constants'
 import { getLinkNameByUrlLocal, getLinkStatusLocal } from '../utils/linksUtils'
@@ -98,7 +99,8 @@ export class linksController {
       const cleanData = {
         ...validatedLink,
         user: userObjectId,
-        categoryId: (validatedLink.categoryId != null) ? new mongoose.Types.ObjectId(validatedLink.categoryId) : undefined
+        categoryId: (validatedLink.categoryId != null) ? new mongoose.Types.ObjectId(validatedLink.categoryId) : undefined,
+        type: LinkAnalyzer.analyze(validatedLink.url)
       }
       const data = await linkModel.createLink({ cleanData })
       return res.status(201).json({ ...constants.API_SUCCESS_RESPONSE, data })
