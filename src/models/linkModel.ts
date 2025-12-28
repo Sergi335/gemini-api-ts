@@ -31,6 +31,9 @@ export interface LinkFields {
     dir: string
     siteName: string
   }
+  transcript?: string
+  summary?: string
+  chatHistory?: Array<{ role: 'user' | 'model', content: string }>
 }
 export interface ValidatedLinkData extends LinkFields {
   previousIds?: LinkFields[]

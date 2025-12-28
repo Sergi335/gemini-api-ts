@@ -1,5 +1,6 @@
 import Express from 'express'
 import { z } from 'zod'
+import { AIController } from '../../controllers/aiController'
 import { linksController } from '../../controllers/linksController'
 import {
   createLinkBodySchema,
@@ -45,6 +46,8 @@ linksRouter.post('/',
   validateBody(createLinkBodySchema),
   linksController.createLink
 )
+linksRouter.post('/:id/ai/summary', validateParams(linkIdParamsSchema), AIController.summarizeLink)
+linksRouter.post('/:id/ai/chat', validateParams(linkIdParamsSchema), AIController.chatWithLink) // Add body validation if needed
 linksRouter.post('/:id/extract', validateParams(linkIdParamsSchema), linksController.extractArticle)
 linksRouter.patch('/',
   validateBody(updateLinkBodySchema),

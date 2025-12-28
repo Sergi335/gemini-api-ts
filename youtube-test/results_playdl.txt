@@ -1,0 +1,6 @@
+Starting Play-DL Tests...
+
+--- Testing play-dl for Z0yCMsgtXfA ---
+[PLAY-DL] Searching stream for https://www.youtube.com/watch?v=Z0yCMsgtXfA...
+[PLAY-DL] Title: La Nueva Forma De Ganar Dinero Con ChatGPT
+[PLAY-DL] FAILED: Invalid URL

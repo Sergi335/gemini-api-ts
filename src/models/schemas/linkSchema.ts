@@ -53,6 +53,21 @@ const LinkSchema = new Schema({
   extractedArticle: {
     type: Object,
     required: false
+  },
+  transcript: {
+    type: String
+  },
+  summary: {
+    type: String
+  },
+  chatHistory: {
+    type: [
+      {
+        role: { type: String, enum: ['user', 'model'] },
+        content: { type: String }
+      }
+    ],
+    default: []
   }
 }, {
   timestamps: true,

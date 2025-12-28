@@ -31,7 +31,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.901.0",
     "@aws-sdk/s3-request-presigner": "^3.901.0",
+    "@distube/ytdl-core": "^4.16.12",
+    "@google/generative-ai": "^0.24.1",
     "@mozilla/readability": "^0.6.0",
+    "@types/fs-extra": "^11.0.4",
     "@types/jsdom": "^21.1.7",
     "axios": "^1.11.0",
     "cheerio": "1.0.0-rc.12",
@@ -42,11 +45,16 @@
     "express": "^4.21.2",
     "firebase": "^12.0.0",
     "firebase-admin": "^13.4.0",
+    "fs-extra": "^11.3.3",
     "helmet": "^8.1.0",
     "jsdom": "^26.1.0",
     "mongoose": "^6.13.8",
     "multer": "1.4.5-lts.1",
     "nodemon": "^3.1.10",
+    "openai": "^6.15.0",
+    "play-dl": "^1.9.7",
+    "youtube-transcript": "^1.2.1",
+    "youtubei.js": "^16.0.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
