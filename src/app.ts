@@ -47,6 +47,12 @@ app.get('/', (req, res) => {
   res.json({ csrfToken, message: 'Welcome to the Zenmarks API!' })
 })
 
+// Endpoint dedicado para renovar CSRF token (sin protección CSRF)
+app.get('/csrf-token', (req, res) => {
+  const csrfToken = generateCsrfToken(req, res)
+  res.json({ csrfToken })
+})
+
 // Auth necesita CSRF pero no sesión previa
 app.use('/auth', doubleCsrfProtection, authRouter)
 

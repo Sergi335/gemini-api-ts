@@ -25,6 +25,11 @@ export const globalErrorHandler = (
     timestamp: new Date().toISOString()
   })
 
+  // Detect CSRF errors
+  const isCsrfError = err.message?.toLowerCase().includes('csrf') ||
+                      err.message?.toLowerCase().includes('invalid csrf token') ||
+                      (err.statusCode === 403 && req.path !== '/csrf-token')
+
   // Send error response
   if (err.statusCode === 500) {
     res.status(500).json({
@@ -34,7 +39,8 @@ export const globalErrorHandler = (
   } else {
     res.status(err.statusCode).json({
       status: 'fail',
-      message: err.message
+      message: err.message,
+      csrfError: isCsrfError
     })
   }
 }

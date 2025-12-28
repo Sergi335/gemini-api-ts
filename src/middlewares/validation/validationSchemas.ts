@@ -61,7 +61,13 @@ export const updateLinkBodySchema = z.object({
       notes: z.record(z.object({}).passthrough()).optional(),
       bookmark: z.boolean().optional(),
       extractedArticle: z.null().optional(),
-      type: z.enum(['video', 'article', 'general']).optional()
+      type: z.enum(['video', 'article', 'general']).optional(),
+      summary: z.string().nullable().optional(),
+      transcript: z.string().nullable().optional(),
+      chatHistory: z.array(z.object({
+        role: z.enum(['user', 'model']),
+        content: z.string()
+      })).nullable().optional()
     }).partial(),
     destinyIds: z.array(z.object({
       id: z.string().min(1, 'ID de destino requerido'),
