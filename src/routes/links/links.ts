@@ -49,6 +49,8 @@ linksRouter.post('/',
 linksRouter.post('/:id/ai/summary', validateParams(linkIdParamsSchema), AIController.summarizeLink)
 linksRouter.post('/:id/ai/chat', validateParams(linkIdParamsSchema), AIController.chatWithLink) // Add body validation if needed
 linksRouter.delete('/:id/ai', validateParams(linkIdParamsSchema), AIController.deleteSummaryAndChat)
+linksRouter.delete('/:id/ai/summary', validateParams(linkIdParamsSchema), AIController.deleteSummary)
+linksRouter.delete('/:id/ai/chat', validateParams(linkIdParamsSchema), AIController.deleteChat)
 linksRouter.post('/:id/extract', validateParams(linkIdParamsSchema), linksController.extractArticle)
 linksRouter.patch('/',
   validateBody(updateLinkBodySchema),

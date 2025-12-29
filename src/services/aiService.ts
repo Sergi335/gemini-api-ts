@@ -1,132 +1,172 @@
 /* eslint-disable @typescript-eslint/no-extraneous-class */
-import { Content, GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 
 export class AIService {
-  private static getModel (): any {
+  private static getAI (): GoogleGenAI {
     const apiKey = process.env.GEMINI_API_KEY
     if (typeof apiKey !== 'string' || apiKey === '') {
       throw new Error('GEMINI_API_KEY is not set')
     }
-    const genAI = new GoogleGenerativeAI(apiKey)
-    return genAI.getGenerativeModel({ model: 'gemini-2.5-pro' })
+    return new GoogleGenAI({ apiKey })
+  }
+
+  private static getModelName (): string {
+    return process.env.GEMINI_MODEL ?? 'gemini-2.0-flash-exp'
   }
 
   static async generateSummary (text: string): Promise<string> {
     try {
       console.log(`[AIService] Generating summary for text (length: ${text.length})...`)
-      const model = this.getModel()
+      const ai = this.getAI()
       const prompt = `Por favor, proporciona un resumen en español, punto por punto (usando viñetas), del siguiente texto:\n\n${text}`
-      const result = await model.generateContent(prompt)
-      const response = await result.response
-      const summary = String(response.text())
+
+      const response = await ai.models.generateContent({
+        model: this.getModelName(),
+        contents: [{ text: prompt }]
+      })
+
+      if (response.text === undefined) {
+        throw new Error('Failed to generate summary')
+      }
+      const summary = String(response.text)
       console.log(`[AIService] Summary generated successfully (length: ${summary.length}).`)
       return summary
     } catch (error) {
-      console.error('Error generating summary:', error)
-      throw new Error('Failed to generate summary')
+      console.error('Error in AIService:', error)
+      if (error instanceof Error && error.message === 'GEMINI_API_KEY is not set') {
+        throw error
+      }
+      throw new Error('Failed to perform AI operation')
     }
   }
 
   static async summarizeVideo (url: string): Promise<string> {
     try {
       console.log(`[AIService] Generating summary for video: ${url}...`)
-      const model = this.getModel()
-      const result = await model.generateContent([
+      const ai = this.getAI()
+      const contents = [
         {
           fileData: {
-            mimeType: 'video/mp4',
             fileUri: url
           }
         },
         { text: 'Por favor, proporciona un resumen en español, punto por punto (usando viñetas), de este vídeo de YouTube.' }
-      ])
-      const response = await result.response
-      const summary = String(response.text())
+      ]
+
+      const response = await ai.models.generateContent({
+        model: this.getModelName(),
+        contents
+      })
+
+      if (response.text === undefined) {
+        throw new Error('Failed to generate video summary')
+      }
+      const summary = String(response.text)
       console.log(`[AIService] Video summary generated successfully (length: ${summary.length}).`)
       return summary
     } catch (error) {
-      console.error('Error generating video summary:', error)
-      throw new Error('Failed to generate video summary. Note: Gemini API only supports public YouTube videos.')
+      console.error('Error in AIService:', error)
+      if (error instanceof Error && error.message === 'GEMINI_API_KEY is not set') {
+        throw error
+      }
+      throw new Error('Failed to perform AI operation')
     }
   }
 
   static async chat (context: string, history: Array<{ role: 'user' | 'model', content: string }>, message: string): Promise<string> {
     try {
-      const model = this.getModel()
+      const ai = this.getAI()
 
-      // Convert internal history format to Gemini format
-      const chatHistory: Content[] = history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.content }]
-      }))
-
-      const chat = model.startChat({
-        history: [
-          {
-            role: 'user',
-            parts: [{ text: `Here is the context for our conversation:\n\n${context}` }]
-          },
-          {
-            role: 'model',
-            parts: [{ text: 'Understood. I will answer questions based on this context.' }]
-          },
-          ...chatHistory
-        ]
-      })
+      // Build chat history in new format
+      const contents = [
+        {
+          role: 'user',
+          parts: [{ text: `Here is the context for our conversation:\n\n${context}` }]
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Understood. I will answer questions based on this context.' }]
+        },
+        ...history.map(msg => ({
+          role: msg.role,
+          parts: [{ text: msg.content }]
+        })),
+        {
+          role: 'user',
+          parts: [{ text: message }]
+        }
+      ]
 
       console.log(`[AIService] Sending chat message. History length: ${history.length} messages.`)
-      const result = await chat.sendMessage(message)
-      const response = await result.response
-      const answer = String(response.text())
+      const response = await ai.models.generateContent({
+        model: this.getModelName(),
+        contents
+      })
+
+      if (response.text === undefined) {
+        throw new Error('Failed to chat')
+      }
+      const answer = String(response.text)
       console.log(`[AIService] Chat response received (length: ${answer.length}).`)
       return answer
     } catch (error) {
-      console.error('Error in chat:', error)
-      throw new Error('Failed to chat')
+      console.error('Error in AIService:', error)
+      if (error instanceof Error && error.message === 'GEMINI_API_KEY is not set') {
+        throw error
+      }
+      throw new Error('Failed to perform AI operation')
     }
   }
 
   static async chatWithVideo (url: string, history: Array<{ role: 'user' | 'model', content: string }>, message: string): Promise<string> {
     try {
-      const model = this.getModel()
+      const ai = this.getAI()
 
-      // Convert internal history format to Gemini format
-      const chatHistory: Content[] = history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.content }]
-      }))
-
-      const chat = model.startChat({
-        history: [
-          {
-            role: 'user',
-            parts: [
-              {
-                fileData: {
-                  mimeType: 'video/mp4',
-                  fileUri: url
-                }
-              },
-              { text: 'Here is a video for context. Please answer questions based on it.' }
-            ]
-          },
-          {
-            role: 'model',
-            parts: [{ text: 'Understood. I will answer questions based on this video.' }]
-          },
-          ...chatHistory
-        ]
-      })
+      // Build chat history with video context in new format
+      const contents = [
+        {
+          role: 'user',
+          parts: [
+            {
+              fileData: {
+                fileUri: url
+              }
+            },
+            { text: 'Here is a video for context. Please answer questions based on it.' }
+          ]
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Understood. I will answer questions based on this video.' }]
+        },
+        ...history.map(msg => ({
+          role: msg.role,
+          parts: [{ text: msg.content }]
+        })),
+        {
+          role: 'user',
+          parts: [{ text: message }]
+        }
+      ]
 
       console.log(`[AIService] Sending chat message with video context. History length: ${history.length} messages.`)
-      const result = await chat.sendMessage(message)
-      const response = await result.response
-      const answer = String(response.text())
+      const response = await ai.models.generateContent({
+        model: this.getModelName(),
+        contents
+      })
+
+      if (response.text === undefined) {
+        throw new Error('Failed to chat with video')
+      }
+      const answer = String(response.text)
       console.log(`[AIService] Chat response received (length: ${answer.length}).`)
       return answer
     } catch (error) {
-      console.error('Error in chatWithVideo:', error)
-      throw new Error('Failed to chat with video. Note: Gemini API only supports public YouTube videos.')
+      console.error('Error in AIService:', error)
+      if (error instanceof Error && error.message === 'GEMINI_API_KEY is not set') {
+        throw error
+      }
+      throw new Error('Failed to perform AI operation. Note: Gemini API only supports public YouTube videos.')
     }
   }
 }

@@ -1,17 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { AIService } from './aiService'
 
-// Mock GoogleGenerativeAI
+// Mock GoogleGenAI
 const mockGenerateContent = vi.fn()
-const mockStartChat = vi.fn()
-const mockSendMessage = vi.fn()
 
-vi.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: vi.fn().mockImplementation(() => ({
-    getGenerativeModel: vi.fn().mockReturnValue({
-      generateContent: mockGenerateContent,
-      startChat: mockStartChat
-    })
+vi.mock('@google/genai', () => ({
+  GoogleGenAI: vi.fn().mockImplementation(() => ({
+    models: {
+      generateContent: mockGenerateContent
+    }
   }))
 }))
 
@@ -22,8 +19,6 @@ describe('AIService', () => {
     vi.resetModules()
     process.env = { ...originalEnv, GEMINI_API_KEY: 'test-key' }
     mockGenerateContent.mockReset()
-    mockStartChat.mockReset()
-    mockSendMessage.mockReset()
   })
 
   afterEach(() => {
@@ -32,9 +27,7 @@ describe('AIService', () => {
 
   it('should generate summary successfully', async () => {
     mockGenerateContent.mockResolvedValue({
-      response: Promise.resolve({
-        text: () => 'Summary text'
-      })
+      text: 'Summary text'
     })
 
     const result = await AIService.generateSummary('verify text')
@@ -42,20 +35,34 @@ describe('AIService', () => {
     expect(mockGenerateContent).toHaveBeenCalled()
   })
 
-  it('should chat successfully', async () => {
-    mockStartChat.mockReturnValue({
-      sendMessage: mockSendMessage
+  it('should summarize video successfully', async () => {
+    mockGenerateContent.mockResolvedValue({
+      text: 'Video summary'
     })
 
-    mockSendMessage.mockResolvedValue({
-      response: Promise.resolve({
-        text: () => 'Chat response'
-      })
+    const result = await AIService.summarizeVideo('https://youtube.com/watch?v=test')
+    expect(result).toBe('Video summary')
+    expect(mockGenerateContent).toHaveBeenCalled()
+  })
+
+  it('should chat successfully', async () => {
+    mockGenerateContent.mockResolvedValue({
+      text: 'Chat response'
     })
 
     const result = await AIService.chat('context', [], 'msg')
     expect(result).toBe('Chat response')
-    expect(mockStartChat).toHaveBeenCalled()
+    expect(mockGenerateContent).toHaveBeenCalled()
+  })
+
+  it('should chat with video successfully', async () => {
+    mockGenerateContent.mockResolvedValue({
+      text: 'Video chat response'
+    })
+
+    const result = await AIService.chatWithVideo('https://youtube.com/watch?v=test', [], 'msg')
+    expect(result).toBe('Video chat response')
+    expect(mockGenerateContent).toHaveBeenCalled()
   })
 
   it('should throw error if API key is missing', async () => {

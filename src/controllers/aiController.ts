@@ -167,4 +167,54 @@ export class AIController {
       return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Internal server error' })
     }
   }
+
+  static async deleteSummary (req: RequestWithUser, res: Response): Promise<Response> {
+    try {
+      const user = String(req.user?._id ?? 'unknown')
+      const { id } = req.params
+      console.log(`[AIController] Received delete summary request for link ID: ${id} by user: ${user}`)
+
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+
+      const updatedLink = await linkModel.updateLink({
+        updates: [{
+          id,
+          user,
+          fields: { summary: '' }
+        }]
+      })
+
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: updatedLink })
+    } catch (error) {
+      console.error('Error in deleteSummary:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Internal server error' })
+    }
+  }
+
+  static async deleteChat (req: RequestWithUser, res: Response): Promise<Response> {
+    try {
+      const user = String(req.user?._id ?? 'unknown')
+      const { id } = req.params
+      console.log(`[AIController] Received delete chat request for link ID: ${id} by user: ${user}`)
+
+      if (user === undefined || user === null || user === '') {
+        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+      }
+
+      const updatedLink = await linkModel.updateLink({
+        updates: [{
+          id,
+          user,
+          fields: { chatHistory: [] } as any
+        }]
+      })
+
+      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: updatedLink })
+    } catch (error) {
+      console.error('Error in deleteChat:', error)
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Internal server error' })
+    }
+  }
 }
