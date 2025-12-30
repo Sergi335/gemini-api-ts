@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 import { GoogleGenAI } from '@google/genai'
+import { YOUTUBE_SUMMARY_PROMPT } from '../prompts'
 
 export class AIService {
   private static getAI (): GoogleGenAI {
@@ -50,7 +51,7 @@ export class AIService {
             fileUri: url
           }
         },
-        { text: 'Por favor, proporciona un resumen en español, punto por punto (usando viñetas), de este vídeo de YouTube.' }
+        { text: YOUTUBE_SUMMARY_PROMPT }
       ]
 
       const response = await ai.models.generateContent({
