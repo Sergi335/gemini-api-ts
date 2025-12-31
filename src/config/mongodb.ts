@@ -5,7 +5,7 @@ export const dbConnect = async (): Promise<void> => {
   mongoose.set('strictQuery', true)
 
   const { DB_URI, DB_URI_TEST, NODE_ENV } = process.env
-  console.log('🚀 ~ dbConnect ~ NODE_ENV:', NODE_ENV)
+  // const { DB_URI, DB_URI_TEST, NODE_ENV } = process.env // Already declared above
   const connectionString = NODE_ENV === 'test'
     ? DB_URI_TEST
     : DB_URI

@@ -7,7 +7,13 @@ const setMock = vi.fn()
 vi.mock('mongoose', () => ({
   default: {
     connect: connectMock,
-    set: setMock
+    set: setMock,
+    connection: {
+      db: {
+        databaseName: 'test-db'
+      },
+      host: 'localhost'
+    }
   }
 }))
 

@@ -3,13 +3,34 @@ import axios from 'axios'
 import { getLinkNameByUrlLocal, getLinkStatusLocal } from './linksUtils'
 
 // Mock de axios
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn()
+vi.mock('axios', () => {
+  const m = {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+    default: {
+      get: vi.fn(),
+      post: vi.fn(),
+      patch: vi.fn(),
+      delete: vi.fn()
+    }
   }
-}))
+  m.default.get = m.get
+  m.default.post = m.post
+  m.default.patch = m.patch
+  m.default.delete = m.delete
+  return m
+})
 
 const mockedAxios = axios as any
+// Sincronizar el objeto principal con .default para compatibilidad ESM total
+if (mockedAxios.default) {
+  mockedAxios.get = mockedAxios.default.get
+  mockedAxios.post = mockedAxios.default.post
+  mockedAxios.patch = mockedAxios.default.patch
+  mockedAxios.delete = mockedAxios.default.delete
+}
 
 describe('linksUtils', () => {
   beforeEach(() => {
@@ -25,25 +46,32 @@ describe('linksUtils', () => {
       const mockHtml = '<html><head><title>Mi Página de Prueba</title></head><body></body></html>'
       mockedAxios.get.mockResolvedValue({
         data: mockHtml,
-        status: 200
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+        statusText: 'OK'
       })
 
       const result = await getLinkNameByUrlLocal({ url: 'https://example.com' })
 
       expect(result).toBe('Mi Página de Prueba')
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com')
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        expect.stringContaining('https://example.com'),
+        expect.any(Object)
+      )
     })
 
     it('devuelve el host cuando no hay título en la página', async () => {
       const mockHtml = '<html><head></head><body></body></html>'
       mockedAxios.get.mockResolvedValue({
         data: mockHtml,
-        status: 200
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+        statusText: 'OK'
       })
 
       const result = await getLinkNameByUrlLocal({ url: 'https://example.com/path' })
 
-      expect(result).toBe('')
+      expect(result).toBe('example.com')
     })
 
     it('devuelve el host cuando la solicitud falla', async () => {
@@ -58,24 +86,28 @@ describe('linksUtils', () => {
       const mockHtml = '<html><head><title>  Mi Título con Espacios  </title></head><body></body></html>'
       mockedAxios.get.mockResolvedValue({
         data: mockHtml,
-        status: 200
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+        statusText: 'OK'
       })
 
       const result = await getLinkNameByUrlLocal({ url: 'https://example.com' })
 
-      expect(result).toBe('  Mi Título con Espacios  ')
+      expect(result).toBe('Mi Título con Espacios')
     })
 
     it('maneja títulos vacíos', async () => {
       const mockHtml = '<html><head><title></title></head><body></body></html>'
       mockedAxios.get.mockResolvedValue({
         data: mockHtml,
-        status: 200
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+        statusText: 'OK'
       })
 
       const result = await getLinkNameByUrlLocal({ url: 'https://example.com' })
 
-      expect(result).toBe('')
+      expect(result).toBe('example.com')
     })
   })
 

@@ -21,6 +21,8 @@ describe('Categories Integration Tests', () => {
   let mongoServer: MongoMemoryServer
   let testUserId: string
   let testUser: any
+  let csrfToken: string
+  let csrfCookies: string[] = []
 
   beforeAll(async () => {
     // Inicializar MongoDB en memoria
@@ -54,6 +56,11 @@ describe('Categories Integration Tests', () => {
       uid: 'test-user-id'
     })
     testUserId = testUser._id.toString()
+
+    // Obtener CSRF token real
+    const getRes = await request(app).get('/csrf-token')
+    csrfToken = getRes.body.csrfToken
+    csrfCookies = (getRes.headers['set-cookie'] as unknown as string[]) ?? []
 
     // Crear categorías de prueba
     await createTestCategories()
@@ -115,9 +122,9 @@ describe('Categories Integration Tests', () => {
 
   // Helper para hacer requests autenticados
   const authenticatedRequest = (method: 'get' | 'post' | 'patch' | 'delete', path: string): request.Test => {
-    return request(app)[method](path)
-      .set('Cookie', ['session=mock-session-token', 'csrfToken=mock-csrf-token'])
-      .set('x-csrf-token', 'mock-csrf-token')
+    const req = request(app)[method](path)
+    const allCookies = [...csrfCookies, 'session=mock-session-token'].join('; ')
+    return req.set('Cookie', allCookies).set('x-csrf-token', csrfToken)
   }
 
   describe('GET /categories', () => {
@@ -137,7 +144,7 @@ describe('Categories Integration Tests', () => {
         .get('/categories')
         .expect(401)
 
-      expect(response.body.error).toBe('NOT COOKIE!')
+      expect(response.body.error).toBe('No hay cookie de sesión')
     })
 
     it('debería retornar array vacío para usuario sin categorías', async () => {

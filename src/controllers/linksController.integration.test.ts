@@ -22,6 +22,9 @@ describe('Links Integration Tests', () => {
   let testUserId: string
   let testUser: any
   let testCategories: Array<{ _id: mongoose.Types.ObjectId, name: string, slug: string, level: number, order: number, user: mongoose.Types.ObjectId, parentId: null | mongoose.Types.ObjectId, parentSlug: null | string }>
+  let csrfToken: string
+  let csrfCookies: string[] = []
+  let agent: request.Agent
 
   beforeAll(async () => {
     // Inicializar MongoDB en memoria
@@ -55,6 +58,13 @@ describe('Links Integration Tests', () => {
       uid: 'test-user-id'
     })
     testUserId = testUser._id.toString()
+
+    agent = request.agent(app)
+
+    // Obtener CSRF token real usando el agente
+    const getRes = await agent.get('/csrf-token')
+    csrfToken = getRes.body.csrfToken
+    csrfCookies = (getRes.headers['set-cookie'] as unknown as string[]) ?? []
 
     // Crear categorías de prueba
     testCategories = await createTestCategories()
@@ -127,10 +137,11 @@ describe('Links Integration Tests', () => {
   }
 
   // Helper para hacer requests autenticados
+  // Helper para hacer requests autenticados usando el agente persistente
   const authenticatedRequest = (method: 'get' | 'post' | 'patch' | 'delete', path: string): request.Test => {
-    return request(app)[method](path)
-      .set('Cookie', ['session=mock-session-token', 'csrfToken=mock-csrf-token'])
-      .set('x-csrf-token', 'mock-csrf-token')
+    return agent[method](path)
+      .set('Cookie', 'session=mock-session-token') // El agente ya debería tener las cookies CSRF
+      .set('x-csrf-token', csrfToken)
   }
 
   describe('GET /links', () => {
@@ -150,7 +161,7 @@ describe('Links Integration Tests', () => {
         .get('/links')
         .expect(401)
 
-      expect(response.body.error).toBe('NOT COOKIE!')
+      expect(response.body.error).toBe('No hay cookie de sesión')
     })
 
     it('debería retornar array vacío para usuario sin links', async () => {
