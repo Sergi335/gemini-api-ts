@@ -111,7 +111,7 @@ export const updateUserBodySchema = z.object({
     name: z.string().min(2).optional(),
     email: z.string().email().optional(),
     profileImage: z.string().url().optional(),
-    website: z.string().url().optional(),
+    website: z.string().optional(),
     aboutMe: z.string().max(500).optional(),
     realName: z.string().min(2).optional()
   })
