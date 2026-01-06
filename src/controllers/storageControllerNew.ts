@@ -249,7 +249,7 @@ export class storageControllerNew {
         return res.status(200).json({
           ...constants.API_SUCCESS_RESPONSE,
           data: {
-            url: signedUrl,
+            url: key,
             name: `${uniqueSuffix}.${extension}`,
             key
           }

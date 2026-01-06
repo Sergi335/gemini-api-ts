@@ -280,11 +280,22 @@ export class linkModel {
     if (typeof url !== 'string' || url.trim() === '') {
       return { error: 'URL inválida' }
     }
-    const urlObj = new URL(url)
-    const dominio = 'zenmarks.f7f6c803413fe2e68bdebec937cceb89.r2.cloudflarestorage.com'
+    // const urlObj = new URL(url)
+    const dominio = 'sergiadn335@gmail.com/images/icons/'
     const dominio2 = 't1.gstatic.com'
 
-    const imagePath = (urlObj.hostname === dominio || urlObj.hostname === dominio2) ? url : urlObj.pathname
+    let imagePath
+
+    if (url.includes(dominio)) {
+      imagePath = url
+    }
+    if (url.includes(dominio2)) {
+      imagePath = url
+    }
+    if (!url.includes(dominio) && !url.includes(dominio2)) {
+      imagePath = `/img/${url.split('/').pop() ?? ''}`
+    }
+    // const imagePath = (url.includes(dominio) || url.includes(dominio2)) ? url : `/img/${url.split('/').pop() ?? ''}`
 
     try {
       const userObjectId = new mongoose.Types.ObjectId(user)
