@@ -61,7 +61,7 @@ export const updateLinkBodySchema = z.object({
       notes: z.record(z.object({}).passthrough()).optional(),
       bookmark: z.boolean().optional(),
       extractedArticle: z.null().optional(),
-      type: z.enum(['video', 'article', 'general']).optional(),
+      type: z.enum(['video', 'article', 'general', 'note']).optional(),
       summary: z.string().nullable().optional(),
       transcript: z.string().nullable().optional(),
       chatHistory: z.array(z.object({

@@ -16,7 +16,7 @@ const LinkSchema = new Schema({
   },
   type: {
     type: String,
-    enum: ['video', 'article', 'general'],
+    enum: ['video', 'article', 'general', 'note'],
     default: 'general'
   },
   categoryName: {
