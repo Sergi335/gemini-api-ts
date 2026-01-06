@@ -1,35 +1,264 @@
 {
   "categories": [
     {
-      "_id": "60d5ec49f8c7b8001c8c4c4c",
-      "name": "Category 1",
+      "_id": "65996b1a0000000000000001",
+      "name": "inicio",
       "user": "test@example.com",
       "order": 0,
       "level": 0
     },
     {
-      "_id": "60d5ec49f8c7b8001c8c4c4d",
-      "name": "Subcategory 1.1",
-      "parentCategory": "60d5ec49f8c7b8001c8c4c4c",
+      "_id": "65996b1a0000000000000002",
+      "name": "Noticias",
+      "parentId": "65996b1a0000000000000001",
       "user": "test@example.com",
       "order": 0,
+      "level": 1
+    },
+    {
+      "_id": "65996b1a0000000000000003",
+      "name": "Video",
+      "parentId": "65996b1a0000000000000001",
+      "user": "test@example.com",
+      "order": 1,
+      "level": 1
+    },
+    {
+      "_id": "65996b1a0000000000000004",
+      "name": "Música",
+      "parentId": "65996b1a0000000000000001",
+      "user": "test@example.com",
+      "order": 2,
+      "level": 1
+    },
+    {
+      "_id": "65996b1a0000000000000020",
+      "name": "Social",
+      "parentId": "65996b1a0000000000000001",
+      "user": "test@example.com",
+      "order": 3,
       "level": 1
     }
   ],
   "links": [
     {
-      "_id": "60d5ec49f8c7b8001c8c4c4e",
-      "name": "Example Link",
-      "description": "A description",
-      "URL": "https://example.com",
-      "imgURL": "",
-      "categoryId": "60d5ec49f8c7b8001c8c4c4d",
+      "_id": "65996b1a0000000000000005",
+      "name": "El País",
+      "description": "Noticias de última hora sobre la actualidad en España y el mundo",
+      "url": "https://elpais.com",
+      "categoryId": "65996b1a0000000000000002",
       "order": 0,
       "user": "test@example.com",
-      "notes": "",
-      "images": [],
       "bookmark": false,
-      "bookmarkOrder": 0,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000006",
+      "name": "ABC",
+      "description": "Diario ABC.es. Noticias de actualidad nacional e internacional",
+      "url": "https://www.abc.es",
+      "categoryId": "65996b1a0000000000000002",
+      "order": 1,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000007",
+      "name": "El Mundo",
+      "description": "Periódico online con noticias de actualidad y última hora",
+      "url": "https://www.elmundo.es",
+      "categoryId": "65996b1a0000000000000002",
+      "order": 2,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000008",
+      "name": "La Vanguardia",
+      "description": "Última hora y noticias de hoy en La Vanguardia",
+      "url": "https://www.lavanguardia.com",
+      "categoryId": "65996b1a0000000000000002",
+      "order": 3,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000009",
+      "name": "RTVE Noticias",
+      "description": "Información, última hora y noticias de España y el mundo",
+      "url": "https://www.rtve.es/noticias/",
+      "categoryId": "65996b1a0000000000000002",
+      "order": 4,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000010",
+      "name": "YouTube",
+      "description": "Disfruta de los vídeos y la música que te gusta",
+      "url": "https://www.youtube.com",
+      "categoryId": "65996b1a0000000000000003",
+      "order": 0,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000011",
+      "name": "Netflix",
+      "description": "Ver series online y películas online",
+      "url": "https://www.netflix.com",
+      "categoryId": "65996b1a0000000000000003",
+      "order": 1,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000012",
+      "name": "Disney+",
+      "description": "Las mejores historias en un mismo sitio",
+      "url": "https://www.disneyplus.com",
+      "categoryId": "65996b1a0000000000000003",
+      "order": 2,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000013",
+      "name": "HBO Max",
+      "description": "Series originales, películas y mucho más",
+      "url": "https://www.hbomax.com",
+      "categoryId": "65996b1a0000000000000003",
+      "order": 3,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000014",
+      "name": "Twitch",
+      "description": "La plataforma de live streaming líder en el mundo",
+      "url": "https://www.twitch.tv",
+      "categoryId": "65996b1a0000000000000003",
+      "order": 4,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000015",
+      "name": "Spotify",
+      "description": "Música para todos",
+      "url": "https://www.spotify.com",
+      "categoryId": "65996b1a0000000000000004",
+      "order": 0,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000016",
+      "name": "Apple Music",
+      "description": "Millones de canciones. Sin anuncios",
+      "url": "https://music.apple.com",
+      "categoryId": "65996b1a0000000000000004",
+      "order": 1,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000017",
+      "name": "YouTube Music",
+      "description": "Un nuevo servicio de música de YouTube",
+      "url": "https://music.youtube.com",
+      "categoryId": "65996b1a0000000000000004",
+      "order": 2,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000018",
+      "name": "SoundCloud",
+      "description": "Escucha la música que te gusta y descubre nuevas tendencias",
+      "url": "https://soundcloud.com",
+      "categoryId": "65996b1a0000000000000004",
+      "order": 3,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000019",
+      "name": "Tidal",
+      "description": "High Fidelity Music Streaming",
+      "url": "https://tidal.com",
+      "categoryId": "65996b1a0000000000000004",
+      "order": 4,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000021",
+      "name": "Facebook",
+      "description": "Inicia sesión en Facebook para empezar a compartir",
+      "url": "https://www.facebook.com",
+      "categoryId": "65996b1a0000000000000020",
+      "order": 0,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000022",
+      "name": "Instagram",
+      "description": "Captura y comparte momentos del mundo",
+      "url": "https://www.instagram.com",
+      "categoryId": "65996b1a0000000000000020",
+      "order": 1,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000023",
+      "name": "X",
+      "description": "Desde las últimas noticias hasta el entretenimiento",
+      "url": "https://x.com",
+      "categoryId": "65996b1a0000000000000020",
+      "order": 2,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000024",
+      "name": "LinkedIn",
+      "description": "Gestiona tu identidad profesional",
+      "url": "https://www.linkedin.com",
+      "categoryId": "65996b1a0000000000000020",
+      "order": 3,
+      "user": "test@example.com",
+      "bookmark": false,
+      "readlist": false
+    },
+    {
+      "_id": "65996b1a0000000000000025",
+      "name": "TikTok",
+      "description": "Vídeos virales y mucho más",
+      "url": "https://www.tiktok.com",
+      "categoryId": "65996b1a0000000000000020",
+      "order": 4,
+      "user": "test@example.com",
+      "bookmark": false,
       "readlist": false
     }
   ]
