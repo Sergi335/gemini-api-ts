@@ -25,10 +25,13 @@ export class storageControllerNew {
   /**
    * Helper para generar URL firmada de lectura
    */
-  private static async getSignedReadUrl (key: string, expiresIn = 3600): Promise<string> {
+  private static async getSignedReadUrl (key: string, expiresIn = 3600, forceDownload: boolean = false): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: key
+      Key: key,
+      ...(forceDownload && {
+        ResponseContentDisposition: `attachment; filename="${key.split('/').pop() ?? 'download'}"`
+      })
     })
     return await getSignedUrl(r2Client, command, { expiresIn })
   }
@@ -652,7 +655,7 @@ export class storageControllerNew {
     const email = req.user?.email
     console.log(req.body)
 
-    const { key, expiresIn = 3600 } = req.body
+    const { key, expiresIn = 3600, forceDownload = false } = req.body
 
     if (email === undefined || email === null || email === '') {
       return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
@@ -668,7 +671,7 @@ export class storageControllerNew {
         return res.status(403).json({ ...constants.API_FAIL_RESPONSE, error: 'Acceso no autorizado al archivo' })
       }
 
-      const signedUrl = await storageControllerNew.getSignedReadUrl(key, expiresIn)
+      const signedUrl = await storageControllerNew.getSignedReadUrl(key, expiresIn, forceDownload)
 
       return res.status(200).json({
         ...constants.API_SUCCESS_RESPONSE,
