@@ -104,11 +104,10 @@ export class userModel {
     }
   }
 
-  // TODO
-  static async createDummyContent ({ user }: { user: string }): Promise<{ mensaje: string } | { error: string }> {
+  static async restoreBackup ({ email, backupData }: { email: string, backupData: any }): Promise<{ mensaje: string } | { error: string }> {
     try {
-      // El parámetro 'user' es el email del usuario
-      const userDoc = await users.findOne({ email: user })
+      // El parámetro 'email' es el identificador del usuario
+      const userDoc = await users.findOne({ email })
       if (userDoc === null) {
         return { error: 'Usuario no encontrado' }
       }
@@ -121,10 +120,9 @@ export class userModel {
       // Mapa para relacionar los IDs antiguos con los nuevos IDs de MongoDB
       const idMap: Record<string, mongoose.Types.ObjectId> = {}
 
-      // Insertar las categorías de dummyData.json
-      // Se asume que en el JSON el orden permite crear primero los padres
-      for (const cat of dummyData.categories) {
-        const { _id, parentId, user: oldUser, ...rest } = cat
+      // Insertar las categorías
+      for (const cat of backupData.categories) {
+        const { _id, parentId, user: oldUser, createdAt, updatedAt, ...rest } = cat
 
         const newParentId = (parentId !== undefined && idMap[parentId] !== undefined)
           ? idMap[parentId]
@@ -134,16 +132,15 @@ export class userModel {
           ...rest,
           user: userId,
           parentId: newParentId,
-          // Generamos slug y displayName si no existen para evitar errores de esquema
-          slug: (rest as any).slug ?? `${String(userId)}-${rest.name}-${Math.random().toString(36).substring(7)}`,
-          displayName: (rest as any).displayName ?? rest.name
+          slug: rest.slug ?? `${String(userId)}-${String(rest.name)}-${Math.random().toString(36).substring(7)}`,
+          displayName: rest.displayName ?? rest.name
         })
         idMap[_id] = createdCategory._id
       }
 
-      // Insertar los links de dummyData.json
-      for (const enlace of dummyData.links) {
-        const { _id, categoryId, user: oldUser, ...rest } = enlace
+      // Insertar los links
+      for (const enlace of backupData.links) {
+        const { _id, categoryId, user: oldUser, createdAt, updatedAt, ...rest } = enlace
         const newCategoryId = idMap[categoryId]
 
         if (newCategoryId !== undefined) {
@@ -154,14 +151,17 @@ export class userModel {
           })
         }
       }
-      const mensaje = 'Copia de seguridad restaurada correctamente.'
 
-      console.log('Copia de seguridad restaurada correctamente.')
-      return ({ mensaje })
+      console.log('Copia de seguridad restaurada correctamente para:', email)
+      return { mensaje: 'Copia de seguridad restaurada correctamente.' }
     } catch (error) {
-      const mensaje = 'Error al restaurar la copia de seguridad'
       console.error('Error al restaurar la copia de seguridad:', error)
-      return ({ mensaje })
+      return { error: 'Error al restaurar la copia de seguridad' }
     }
+  }
+
+  // TODO
+  static async createDummyContent ({ user }: { user: string }): Promise<{ mensaje: string } | { error: string }> {
+    return await this.restoreBackup({ email: user, backupData: dummyData })
   }
 }

@@ -435,11 +435,11 @@ export class storageControllerNew {
   }
 
   static async restoreUserBackup (req: RequestWithUser, res: Response): Promise<void> {
-    const user = req.user?.name
+    const email = req.user?.email
     const file = req.file
 
-    if (user === undefined || user === null || user === '') {
-      res.status(401).json({ status: 'fail', message: 'Usuario no autenticado' })
+    if (email === undefined || email === null || email === '') {
+      res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: 'Usuario no autenticado' })
       return
     }
 
@@ -449,27 +449,24 @@ export class storageControllerNew {
     }
 
     try {
-      // TODO: Implementar cuando estén disponibles los esquemas necesarios
-      res.status(501).json({ ...constants.API_FAIL_RESPONSE, error: 'Funcionalidad no implementada - faltan esquemas escritorio y columna' })
+      const backupData = JSON.parse(file.buffer.toString())
 
-      /*
-      const buffer = file.buffer
-      const str = buffer.toString()
-      const data = JSON.parse(str)
+      if (backupData.categories === undefined || backupData.links === undefined) {
+        res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'El archivo de copia de seguridad no tiene el formato correcto' })
+        return
+      }
 
-      const { escritorios, columnas, links } = data
+      const result = await userModel.restoreBackup({ email, backupData })
 
-      await escritorio.deleteMany({ user })
-      await columna.deleteMany({ user })
-      await link.deleteMany({ user })
-
-      // Restaurar datos...
+      if ('error' in result) {
+        res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: result.error })
+        return
+      }
 
       res.status(200).json({
         ...constants.API_SUCCESS_RESPONSE,
         message: 'Copia de seguridad restaurada exitosamente'
       })
-      */
     } catch (error) {
       const mensaje = 'Error al restaurar la copia de seguridad'
       console.error('Error al restaurar la copia de seguridad:', error)
