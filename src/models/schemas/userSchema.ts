@@ -1,9 +1,6 @@
-import mongoose, { Schema, model } from 'mongoose'
+import { Schema, model } from 'mongoose'
 
 const UsersSchema = new Schema({
-  _id: {
-    type: mongoose.Types.ObjectId
-  },
   name: {
     type: String
   },

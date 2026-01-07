@@ -53,6 +53,7 @@ export class authController {
       getAuth()
         .getUser(req.body.uid)
         .then(async (userRecord) => {
+          console.log(req.body)
           const nickname = (typeof req.body.nickname === 'string' && req.body.nickname !== '') ? req.body.nickname : `user${Math.floor(Math.random() * 10000000)}`
           // See the UserRecord reference doc for the contents of userRecord.
           const userData = JSON.parse(JSON.stringify(userRecord.toJSON()))

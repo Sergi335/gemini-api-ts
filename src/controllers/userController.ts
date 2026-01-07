@@ -3,7 +3,7 @@ import { categoryModel } from '../models/categoryModel'
 import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
 import { constants } from '../utils/constants'
-import { storageController } from './storageController'
+import { storageControllerNew } from './storageControllerNew'
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class userController {
@@ -38,10 +38,16 @@ export class userController {
       if (email === undefined || email === null || email === '') {
         return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
       }
+      const userData = await userModel.getUser({ email })
 
-      const data = await categoryModel.deleteUserData({ user: email })
-      await storageController.deleteAllUserFiles({ user: email })
-      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data })
+      if (!('error' in userData) && userData._id !== undefined && userData._id !== null) {
+        const userDataDeleted = await categoryModel.deleteUserData({ user: userData._id.toString() })
+        const userDeleted = await userModel.deleteUser({ email })
+        const filesDeleted = await storageControllerNew.deleteAllUserFiles({ user: email })
+        return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: { userDataDeleted, userDeleted, filesDeleted } })
+      } else {
+        return res.status(404).json({ ...constants.API_FAIL_RESPONSE, error: 'El usuario no existe' })
+      }
     } catch (error) {
       console.error('Error al eliminar la información del usuario:', error)
       return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al eliminar la información del usuario' })
@@ -49,20 +55,20 @@ export class userController {
   }
 
   // A userController
-  static async deleteUserData (req: RequestWithUser, res: Response): Promise<Response> {
-    try {
-      const email = req.user?.email
+  // static async deleteUserData (req: RequestWithUser, res: Response): Promise<Response> {
+  //   try {
+  //     const email = req.user?.email
 
-      if (email === undefined || email === null || email === '') {
-        return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
-      }
-      const userDataDeleted = await categoryModel.deleteUserData({ user: email })
-      const userDeleted = await userModel.deleteUser({ email })
-      const filesDeleted = await storageController.deleteAllUserFiles({ user: email })
-      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: { userDataDeleted, userDeleted, filesDeleted } })
-    } catch (error) {
-      console.error('Error al eliminar los datos del usuario:', error)
-      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al eliminar los datos del usuario' })
-    }
-  }
+  //     if (email === undefined || email === null || email === '') {
+  //       return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+  //     }
+  //     const userDataDeleted = await categoryModel.deleteUserData({ user: email })
+  //     const userDeleted = await userModel.deleteUser({ email })
+  //     const filesDeleted = await storageController.deleteAllUserFiles({ user: email })
+  //     return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: { userDataDeleted, userDeleted, filesDeleted } })
+  //   } catch (error) {
+  //     console.error('Error al eliminar los datos del usuario:', error)
+  //     return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al eliminar los datos del usuario' })
+  //   }
+  // }
 }

@@ -100,9 +100,11 @@ export const loginBodySchema = z.object({
 })
 
 export const registerBodySchema = z.object({
-  name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
+  nickname: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
+  csrfToken: z.string().optional(),
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres')
+  idToken: z.string(),
+  uid: z.string().optional()
 })
 
 export const updateUserBodySchema = z.object({

@@ -5,6 +5,8 @@ import { generateCsrfToken } from './csrf'
 
 export const setSessionCookie = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    console.log(req.body)
+
     const idToken = req.body.idToken
 
     console.log('[setSessionCookie] idToken recibido:', idToken)

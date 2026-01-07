@@ -1,6 +1,7 @@
 import cookieParser from 'cookie-parser'
 import express from 'express'
 import helmet from 'helmet'
+import './config/firebase'
 import { checkUserSession } from './middlewares/checkUserSession'
 import cors from './middlewares/cors'
 import { doubleCsrfProtection, generateCsrfToken } from './middlewares/csrf'

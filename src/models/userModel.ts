@@ -107,23 +107,51 @@ export class userModel {
   // TODO
   static async createDummyContent ({ user }: { user: string }): Promise<{ mensaje: string } | { error: string }> {
     try {
-      // Borrar los documentos existentes en las colecciones
-      await category.deleteMany({ user })
-      await link.deleteMany({ user })
-
-      // Insertar los documentos de la copia de seguridad en las colecciones
-      for (const col of dummyData.categories) {
-        const { _id, ...rest } = col
-        await category.create({ ...rest, user })
+      // El parámetro 'user' es el email del usuario
+      const userDoc = await users.findOne({ email: user })
+      if (userDoc === null) {
+        return { error: 'Usuario no encontrado' }
       }
-      const data = await category.find({ user })
+      const userId = userDoc._id
+
+      // Borrar los documentos existentes en las colecciones para este usuario
+      await category.deleteMany({ user: userId })
+      await link.deleteMany({ user: userId })
+
+      // Mapa para relacionar los IDs antiguos con los nuevos IDs de MongoDB
+      const idMap: Record<string, mongoose.Types.ObjectId> = {}
+
+      // Insertar las categorías de dummyData.json
+      // Se asume que en el JSON el orden permite crear primero los padres
+      for (const cat of dummyData.categories) {
+        const { _id, parentId, user: oldUser, ...rest } = cat
+
+        const newParentId = (parentId !== undefined && idMap[parentId] !== undefined)
+          ? idMap[parentId]
+          : undefined
+
+        const createdCategory = await category.create({
+          ...rest,
+          user: userId,
+          parentId: newParentId,
+          // Generamos slug y displayName si no existen para evitar errores de esquema
+          slug: (rest as any).slug ?? `${String(userId)}-${rest.name}-${Math.random().toString(36).substring(7)}`,
+          displayName: (rest as any).displayName ?? rest.name
+        })
+        idMap[_id] = createdCategory._id
+      }
+
+      // Insertar los links de dummyData.json
       for (const enlace of dummyData.links) {
-        const column = data.find(col => col.name === enlace.categoryId)
-        // console.log(id._id, enlace.name)
-        if (column != null) {
-          const { _id, ...rest } = enlace
-          await link.create({ ...rest, idpanel: column._id.toString(), user })
-          // console.log({ ...rest, idpanel: column._id.toString(), user })
+        const { _id, categoryId, user: oldUser, ...rest } = enlace
+        const newCategoryId = idMap[categoryId]
+
+        if (newCategoryId !== undefined) {
+          await link.create({
+            ...rest,
+            categoryId: newCategoryId,
+            user: userId
+          })
         }
       }
       const mensaje = 'Copia de seguridad restaurada correctamente.'
