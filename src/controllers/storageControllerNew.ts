@@ -3,7 +3,7 @@ import { Response } from 'express'
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { categoryModel } from '../models/categoryModel'
-import { LinkFields, linkModel } from '../models/linkModel'
+import { LinkFields, linkModel, ValidatedLinkData } from '../models/linkModel'
 import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
 import { constants } from '../utils/constants'
@@ -824,6 +824,265 @@ export class storageControllerNew {
     } catch (error) {
       console.error('Error al obtener las imágenes de los links:', error)
       return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al obtener las imágenes de los links' })
+    }
+  }
+
+  /**
+   * Importar marcadores desde un archivo HTML de Chrome
+   * Esta función parsea el HTML de marcadores de Chrome y crea las categorías y enlaces correspondientes
+   */
+  static async importChromeBookmarks (req: RequestWithUser, res: Response): Promise<Response> {
+    const email = req.user?.email
+    const userId = req.user?._id
+    const file = req.file
+
+    if (email === undefined || email === null || email === '' || userId === undefined || userId === null || userId === '') {
+      return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
+    }
+
+    if (file === undefined || file === null) {
+      return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No se proporcionó archivo HTML de marcadores' })
+    }
+
+    try {
+      // Leer el contenido del archivo HTML
+      const htmlContent = file.buffer.toString('utf-8')
+
+      // Helper para generar slug único
+      const generateSlug = (name: string, parentSlug?: string): string => {
+        const baseSlug = name.toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+
+        return parentSlug !== undefined && parentSlug !== null && parentSlug !== '' ? `${parentSlug}-${baseSlug}` : baseSlug
+      }
+
+      // Helper para generar URL de favicon de Google
+      const generateGoogleFaviconUrl = (url: string): string => {
+        try {
+          const domain = new URL(url).origin
+          return `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(domain)}&size=64`
+        } catch (error) {
+          console.error('Error al generar URL de favicon:', error)
+          return ''
+        }
+      }
+
+      // Parsear el HTML - Mejorado para manejar la estructura correctamente
+      interface BookmarkNode {
+        type: 'folder' | 'link'
+        name: string
+        url?: string
+        icon?: string
+        addDate?: string
+        children?: BookmarkNode[]
+      }
+
+      const parseBookmarksHTML = (html: string): BookmarkNode[] => {
+        const rootNodes: BookmarkNode[] = []
+        const stack: BookmarkNode[] = []
+
+        // Limpiar el HTML y dividir por líneas
+        const lines = html.split('\n')
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim()
+
+          // Detectar carpetas (H3)
+          if (line.includes('<H3')) {
+            const nameMatch = line.match(/<H3[^>]*>([^<]+)<\/H3>/)
+            if (nameMatch != null) {
+              const folder: BookmarkNode = {
+                type: 'folder',
+                name: nameMatch[1].trim(),
+                children: []
+              }
+
+              // Agregar a la estructura
+              if (stack.length === 0) {
+                rootNodes.push(folder)
+              } else {
+                const parent = stack[stack.length - 1]
+                if (parent.children != null) {
+                  parent.children.push(folder)
+                }
+              }
+
+              // Agregar al stack para futuros hijos
+              stack.push(folder)
+            }
+          } else if (line.includes('<A ')) {
+            // Detectar enlaces (A)
+            // Regex mejorado para capturar todos los atributos
+            const linkMatch = line.match(/<A\s+HREF="([^"]+)"(?:\s+ADD_DATE="(\d+)")?(?:\s+ICON="([^"]+)")?>([^<]+)<\/A>/i)
+            if (linkMatch != null) {
+              const link: BookmarkNode = {
+                type: 'link',
+                name: linkMatch[4].trim(),
+                url: linkMatch[1],
+                addDate: linkMatch[2],
+                icon: linkMatch[3]
+              }
+
+              // Agregar al contenedor actual
+              if (stack.length === 0) {
+                rootNodes.push(link)
+              } else {
+                const parent = stack[stack.length - 1]
+                if (parent.children != null) {
+                  parent.children.push(link)
+                }
+              }
+            }
+          } else if (line.includes('</DL>')) {
+            // Detectar cierre de lista (</DL>) - salir del nivel actual
+            if (stack.length > 0) {
+              stack.pop()
+            }
+          }
+        }
+
+        return rootNodes
+      }
+
+      const bookmarkTree = parseBookmarksHTML(htmlContent)
+
+      // Estadísticas de importación
+      let categoriesCreated = 0
+      let linksCreated = 0
+      let errors = 0
+
+      // Map para guardar IDs de categorías creadas por slug
+      const categoryMap = new Map<string, string>()
+
+      // Función recursiva para procesar el árbol de marcadores
+      const processBookmarkNode = async (node: BookmarkNode, parentId?: string, parentSlug?: string, level: number = 0): Promise<void> => {
+        try {
+          if (node.type === 'folder') {
+            // Crear categoría
+            const slug = generateSlug(node.name, parentSlug)
+
+            // Verificar si la categoría ya existe
+            let categoryId = categoryMap.get(slug)
+
+            if (categoryId === undefined || categoryId === null || categoryId === '') {
+              // Obtener el orden de la última categoría
+              const categories = await categoryModel.getAllCategories({ user: userId })
+              const order = Array.isArray(categories) ? categories.length : 0
+
+              const categoryData = {
+                user: userId,
+                fields: {
+                  name: node.name,
+                  slug,
+                  parentId: (parentId !== undefined && parentId !== null && parentId !== '') ? parentId : undefined,
+                  parentSlug: (parentSlug !== undefined && parentSlug !== null && parentSlug !== '') ? parentSlug : undefined,
+                  level,
+                  order,
+                  isEmpty: false,
+                  hidden: false,
+                  displayName: node.name
+                }
+              }
+
+              const result = await categoryModel.createCategory(categoryData)
+
+              if ('error' in result) {
+                console.error(`Error al crear categoría ${node.name}:`, result.error)
+                errors++
+                return
+              }
+
+              // El resultado es un array, tomamos el primer elemento
+              categoryId = Array.isArray(result) && result.length > 0 ? (result[0] as any)._id?.toString() : undefined
+              if (categoryId !== undefined && categoryId !== null && categoryId !== '') {
+                categoryMap.set(slug, categoryId)
+                categoriesCreated++
+              }
+            }
+
+            // Procesar hijos recursivamente
+            if ((node.children != null) && Array.isArray(node.children) && node.children.length > 0) {
+              for (const child of node.children) {
+                await processBookmarkNode(child, categoryId, slug, level + 1)
+              }
+            }
+          } else if (node.type === 'link') {
+            // Crear enlace
+            if (parentId === undefined || parentId === null || parentId === '') {
+              console.warn(`Enlace sin categoría padre: ${node.name}`)
+              errors++
+              return
+            }
+
+            // Generar URL de favicon usando Google Favicons
+            let imgUrl: string | undefined
+            try {
+              if (node.url !== undefined && node.url !== null && node.url !== '') {
+                imgUrl = generateGoogleFaviconUrl(node.url)
+              }
+            } catch (error) {
+              console.error(`Error al generar favicon URL para ${node.name}:`, error)
+            }
+
+            // Obtener el orden del último link en la categoría
+            const links = await linkModel.getLinksByTopCategoryId({ user: userId, id: parentId })
+            const order = Array.isArray(links) ? links.length : 0
+
+            const linkData: ValidatedLinkData = {
+              name: node.name,
+              url: node.url ?? '',
+              categoryId: parentId,
+              imgUrl,
+              type: 'general' as const,
+              order,
+              bookmark: false,
+              readlist: false,
+              description: (node.addDate !== undefined && node.addDate !== null && node.addDate !== '')
+                ? `Importado desde Chrome - ${new Date(parseInt(node.addDate) * 1000).toLocaleDateString()}`
+                : 'Importado desde Chrome',
+              user: userId
+            }
+
+            const result = await linkModel.createLink({ cleanData: linkData })
+
+            if ('error' in result) {
+              console.error(`Error al crear enlace ${node.name}:`, result.error)
+              errors++
+              return
+            }
+
+            linksCreated++
+          }
+        } catch (error) {
+          console.error(`Error al procesar nodo ${node.name}:`, error)
+          errors++
+        }
+      }
+
+      // Procesar todo el árbol
+      for (const node of bookmarkTree) {
+        await processBookmarkNode(node, undefined, undefined, 0)
+      }
+
+      return res.status(200).json({
+        ...constants.API_SUCCESS_RESPONSE,
+        message: 'Marcadores importados exitosamente',
+        data: {
+          categoriesCreated,
+          linksCreated,
+          errors,
+          summary: `Se crearon ${categoriesCreated} categorías y ${linksCreated} enlaces${errors > 0 ? ` con ${errors} errores` : ''}`
+        }
+      })
+    } catch (error) {
+      console.error('Error al importar marcadores:', error)
+      return res.status(500).json({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Error al importar marcadores de Chrome'
+      })
     }
   }
 }

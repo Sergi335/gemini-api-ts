@@ -44,6 +44,12 @@ storageRouter.post('/profilepic',
   storageControllerNew.uploadProfileImage
 )
 storageRouter.post('/signed-url', storageControllerNew.getSignedFileUrl)
+storageRouter.post('/link/images/bulk', storageControllerNew.getBulkLinkImages)
+storageRouter.post('/import-bookmarks',
+  upload.single('bookmarks'),
+  storageControllerNew.importChromeBookmarks
+)
+
 // Rutas DELETE - con validación de body
 storageRouter.delete('/image',
   validateBody(deleteImageBodySchema),
