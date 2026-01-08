@@ -72,7 +72,8 @@ export class categoryModel {
       throw new Error('Category name is required to generate a slug')
     }
     const objectIdUser = new mongoose.Types.ObjectId(user)
-    const slug = await this.generateUniqueSlug({ user, name: fields.name })
+    // Usar el slug proporcionado en fields si existe, de lo contrario generar uno nuevo
+    const slug = fields.slug ?? await this.generateUniqueSlug({ user, name: fields.name })
     const data = await category.create({ user: objectIdUser, ...fields, slug })
     return [data]
   }

@@ -583,68 +583,59 @@ export class storageControllerNew {
     }
   }
 
-  static async deleteAllUserFiles ({ user }: { user: string }): Promise<{ message: string } | unknown> {
+  static async deleteAllUserFiles ({ user }: { user: string }): Promise<{ message: string, filesDeleted: number } | { error: string }> {
     try {
-      const folders = [
-        `${user}/images/profile/`,
-        `${user}/backups/`,
-        `${user}/images/icons/`,
-        `${user}/images/linkImages/`
-      ]
+      let filesDeleted = 0
+      let continuationToken: string | undefined
 
-      // Eliminar archivos en cada carpeta
-      for (const folder of folders) {
+      // Iterar con paginación hasta que no haya más objetos
+      do {
         const listCommand = new ListObjectsV2Command({
           Bucket: BUCKET_NAME,
-          Prefix: folder
+          Prefix: `${user}/`,
+          MaxKeys: 1000, // Máximo permitido por llamada
+          ContinuationToken: continuationToken
         })
 
         const response = await r2Client.send(listCommand)
         const objects = response.Contents ?? []
 
         if (objects.length > 0) {
-          const deletePromises = objects.map(async (obj: any) => {
-            if ((obj.Key as string) === null || (obj.Key as string) === undefined || (obj.Key as string) === '') return
+          // Filtrar objetos válidos
+          const validObjects = objects.filter((obj: any) =>
+            obj.Key !== null && obj.Key !== undefined && obj.Key !== ''
+          )
 
-            const deleteCommand = new DeleteObjectCommand({
-              Bucket: BUCKET_NAME,
-              Key: obj.Key as string
+          // Eliminar objetos en paralelo (en lotes de 100 para no saturar)
+          const batchSize = 100
+          for (let i = 0; i < validObjects.length; i += batchSize) {
+            const batch = validObjects.slice(i, i + batchSize)
+            const deletePromises = batch.map(async (obj: any) => {
+              try {
+                const deleteCommand = new DeleteObjectCommand({
+                  Bucket: BUCKET_NAME,
+                  Key: obj.Key as string
+                })
+                await r2Client.send(deleteCommand)
+                filesDeleted++
+              } catch (error) {
+                console.error(`Error al eliminar ${String(obj.Key)}:`, error)
+              }
             })
 
-            return await r2Client.send(deleteCommand)
-          })
-
-          await Promise.all(deletePromises)
+            await Promise.all(deletePromises)
+          }
         }
-      }
 
-      // Eliminar cualquier archivo suelto en la carpeta del usuario
-      const userListCommand = new ListObjectsV2Command({
-        Bucket: BUCKET_NAME,
-        Prefix: `${user}/`
-      })
+        // Verificar si hay más objetos (paginación)
+        continuationToken = response.IsTruncated === true ? response.NextContinuationToken : undefined
+      } while (continuationToken !== undefined)
 
-      const userResponse = await r2Client.send(userListCommand)
-      const userObjects = userResponse.Contents ?? []
-
-      if (userObjects.length > 0) {
-        const deleteUserPromises = userObjects.map(async (obj: any) => {
-          if ((obj.Key as string) === null || (obj.Key as string) === undefined || (obj.Key as string) === '') return
-
-          const deleteCommand = new DeleteObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: obj.Key as string
-          })
-
-          return await r2Client.send(deleteCommand)
-        })
-
-        await Promise.all(deleteUserPromises)
-      }
-
-      return { message: 'Todos los archivos del usuario han sido eliminados' }
+      console.log(`✅ Eliminados ${filesDeleted} archivos del usuario ${user}`)
+      return { message: 'Todos los archivos del usuario han sido eliminados', filesDeleted }
     } catch (error) {
-      return error
+      console.error('Error al eliminar archivos del usuario:', error)
+      return { error: 'Error al eliminar archivos del usuario' }
     }
   }
 
