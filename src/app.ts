@@ -11,6 +11,7 @@ import { categoriesRouter } from './routes/categories/categories'
 import { linksRouter } from './routes/links/links'
 import { searchRouter } from './routes/search/search'
 import { storageRouter } from './routes/storage/storage'
+import { stripeRouter } from './routes/stripe/stripe'
 
 const app = express()
 
@@ -38,6 +39,10 @@ app.use(
     crossOriginEmbedderPolicy: false
   })
 )
+
+// Stripe webhook needs raw body - must be BEFORE express.json()
+app.use('/stripe/webhook', express.raw({ type: 'application/json' }))
+
 app.use(express.json())
 app.use(cookieParser())
 app.use(cors)
@@ -62,6 +67,7 @@ app.use('/links', doubleCsrfProtection, checkUserSession, linksRouter)
 app.use('/categories', doubleCsrfProtection, checkUserSession, categoriesRouter)
 app.use('/storage', doubleCsrfProtection, checkUserSession, storageRouter)
 app.use('/search', doubleCsrfProtection, checkUserSession, searchRouter)
+app.use('/stripe', stripeRouter)
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' })
