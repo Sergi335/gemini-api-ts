@@ -36,8 +36,44 @@ const UsersSchema = new Schema({
   lastBackupUrl: {
     type: String
   },
+  stripeCustomerId: {
+    type: String,
+    index: true
+  },
+  subscription: {
+    status: {
+      type: String,
+      enum: ['free', 'active', 'past_due', 'canceled'],
+      default: 'free'
+    },
+    plan: {
+      type: String,
+      enum: ['FREE', 'PRO', 'ENTERPRISE'],
+      default: 'FREE'
+    },
+    stripeSubscriptionId: {
+      type: String
+    },
+    currentPeriodEnd: {
+      type: Date
+    },
+    cancelAtPeriodEnd: {
+      type: Boolean,
+      default: false
+    }
+  },
+  llmCallsThisMonth: {
+    type: Number,
+    default: 0
+  },
+  llmCallsResetAt: {
+    type: Date
+  },
   quota: {
     type: Number
+  },
+  weatherCity: {
+    type: String
   }
 }, {
   timestamps: true,
