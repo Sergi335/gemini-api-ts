@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import * as stripeService from '../services/stripeService'
 import { createCheckoutSchema, createPortalSchema } from '../validation/stripeValidation'
 import type { User } from '../types/userModel.types'
+import users from '../models/schemas/userSchema'
 
 /**
  * POST /stripe/checkout
@@ -24,8 +25,15 @@ export async function createCheckout (req: Request, res: Response): Promise<void
 
     const { priceId, successUrl, cancelUrl } = parsed.data
 
+    // Fetch fresh user data from DB
+    const dbUser = await users.findOne({ email: user.email }).lean()
+    if (dbUser == null) {
+      res.status(404).json({ error: 'User not found in database' })
+      return
+    }
+
     // Get or create customer
-    const customerResult = await stripeService.getOrCreateCustomer(user)
+    const customerResult = await stripeService.getOrCreateCustomer(dbUser as unknown as User)
     if (!customerResult.success || customerResult.data == null) {
       res.status(500).json({ error: customerResult.error })
       return
@@ -58,6 +66,7 @@ export async function createCheckout (req: Request, res: Response): Promise<void
 export async function createPortal (req: Request, res: Response): Promise<void> {
   try {
     const user = (req as Request & { user?: User }).user
+    console.log(user)
     if (user == null) {
       res.status(401).json({ error: 'Unauthorized' })
       return
@@ -72,15 +81,18 @@ export async function createPortal (req: Request, res: Response): Promise<void> 
 
     const { returnUrl } = parsed.data
 
+    // Fetch fresh user data from DB to get stripeCustomerId
+    const dbUser = await users.findOne({ email: user.email }).lean()
+
     // User must have a Stripe customer ID
-    if (user.stripeCustomerId == null) {
+    if (dbUser?.stripeCustomerId == null) {
       res.status(400).json({ error: 'No subscription found' })
       return
     }
 
     // Create portal session
     const sessionResult = await stripeService.createPortalSession(
-      user.stripeCustomerId,
+      dbUser.stripeCustomerId,
       returnUrl
     )
 
@@ -111,6 +123,7 @@ export async function handleWebhook (req: Request, res: Response): Promise<void>
     // Construct event from raw body
     const event = stripeService.constructWebhookEvent(req.body, signature)
     if (event == null) {
+      console.error('Webhook signature verification failed')
       res.status(400).json({ error: 'Invalid webhook signature' })
       return
     }
@@ -118,6 +131,7 @@ export async function handleWebhook (req: Request, res: Response): Promise<void>
     // Handle the event
     const result = await stripeService.handleWebhookEvent(event)
     if (!result.success) {
+      console.error('Webhook event handling failed:', result.error)
       res.status(500).json({ error: result.error })
       return
     }

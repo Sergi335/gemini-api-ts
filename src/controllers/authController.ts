@@ -23,7 +23,12 @@ export class authController {
           profileImage: googleUser.photoURL,
           quota: 0,
           signMethod: 'google',
-          googleId: googleUser.uid
+          googleId: googleUser.uid,
+          subscription: {
+            status: 'free' as const,
+            plan: 'FREE' as const,
+            cancelAtPeriodEnd: false
+          }
         }
         const newUser = await userModel.createUser({ user })
         const test = await userModel.createDummyContent({ user: (newUser as any).email ?? '' })
@@ -60,6 +65,11 @@ export class authController {
           userData.name = nickname
           userData.newUser = true
           userData.quota = 0
+          userData.subscription = {
+            status: 'free' as const,
+            plan: 'FREE' as const,
+            cancelAtPeriodEnd: false
+          }
           console.log(userData)
           const user = await userModel.createUser({ user: userData })
           let email = ''

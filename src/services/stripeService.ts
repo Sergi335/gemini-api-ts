@@ -19,6 +19,12 @@ export async function getOrCreateCustomer (user: User): Promise<StripeServiceRes
       return { success: true, data: user.stripeCustomerId }
     }
 
+    // Check database again to be sure (in case the user object is stale)
+    const dbUser = await users.findOne({ email: user.email })
+    if (dbUser?.stripeCustomerId != null) {
+      return { success: true, data: dbUser.stripeCustomerId }
+    }
+
     // Create a new Stripe customer
     const customer = await stripe.customers.create({
       email: user.email,
