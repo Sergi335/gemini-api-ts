@@ -71,6 +71,9 @@ const UsersSchema = new Schema({
   },
   quota: {
     type: Number
+  },
+  weatherCity: {
+    type: String
   }
 }, {
   timestamps: true,
