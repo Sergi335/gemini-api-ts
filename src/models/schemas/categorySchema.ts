@@ -18,8 +18,7 @@ const CategorySchema = new Schema({
     index: true
   },
   slug: {
-    type: String,
-    unique: true
+    type: String
   },
   parentSlug: {
     type: String
@@ -39,5 +38,7 @@ const CategorySchema = new Schema({
   timestamps: true,
   versionKey: false
 })
+
+CategorySchema.index({ user: 1, slug: 1 }, { unique: true })
 
 export default model('category', CategorySchema)

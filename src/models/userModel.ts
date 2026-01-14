@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import { User, UserUpdateFields } from '../types/userModel.types'
 import category from './schemas/categorySchema'
+import { categoryModel } from './categoryModel'
 import link from './schemas/linkSchema'
 import users from './schemas/userSchema'
 // import { createRequire } from 'node:module'
@@ -132,7 +133,7 @@ export class userModel {
           ...rest,
           user: userId,
           parentId: newParentId,
-          slug: rest.slug ?? `${String(userId)}-${String(rest.name)}-${Math.random().toString(36).substring(7)}`,
+          slug: rest.slug ?? await categoryModel.generateUniqueSlug({ user: String(userId), name: rest.name }),
           displayName: rest.displayName ?? rest.name
         })
         idMap[_id] = createdCategory._id
