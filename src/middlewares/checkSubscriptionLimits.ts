@@ -27,7 +27,7 @@ export async function checkLlmLimit (
       return
     }
 
-    // Check current usage
+    // Ya sumamos en otro lado, hay que consultar a la base de datos las llamadas actuales
     const result = await stripeService.incrementLlmCalls(user.email)
     if (!result.success) {
       res.status(429).json({
