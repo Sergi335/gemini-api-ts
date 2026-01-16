@@ -48,6 +48,7 @@ export async function checkLlmLimit (
 
 /**
  * Middleware to check storage limits based on subscription plan
+ * Solo calcula si se ha sobrepasado el límite, no incrementa el contador
  */
 export async function checkStorageLimit (
   req: Request,
@@ -63,7 +64,7 @@ export async function checkStorageLimit (
 
     const plan: PlanName = (user.subscription?.plan as PlanName) ?? 'FREE'
     const limitMB = PLANS[plan].limits.storageMB
-    const currentQuotaMB = user.quota ?? 0
+    const currentQuotaMB = (user.quota ?? 0) / (1024 * 1024)
 
     // Check if uploading would exceed limit
     // Note: Actual file size should be checked in the storage controller

@@ -264,6 +264,9 @@ export async function getSubscriptionStatus (email: string): Promise<StripeServi
   currentPeriodEnd?: Date
   cancelAtPeriodEnd: boolean
   limits: { storageMB: number, llmCallsPerMonth: number }
+  remainingQuota: number
+  llmCallsThisMonth: number
+  llmCallsResetAt: Date | undefined
 }>> {
   try {
     const user = await users.findOne({ email })
@@ -281,7 +284,10 @@ export async function getSubscriptionStatus (email: string): Promise<StripeServi
         plan,
         currentPeriodEnd: user.subscription?.currentPeriodEnd,
         cancelAtPeriodEnd: user.subscription?.cancelAtPeriodEnd ?? false,
-        limits
+        limits,
+        remainingQuota: limits.storageMB - ((user.quota ?? 0) / (1024 * 1024)),
+        llmCallsThisMonth: user.llmCallsThisMonth,
+        llmCallsResetAt: user.llmCallsResetAt
       }
     }
   } catch (error) {

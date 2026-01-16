@@ -4,6 +4,7 @@ import { AIService } from '../services/aiService'
 import { LinkAnalyzer } from '../services/linkAnalyzer'
 import { RequestWithUser } from '../types/express'
 import { constants } from '../utils/constants'
+import * as stripeService from '../services/stripeService'
 
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AIController {
@@ -62,6 +63,16 @@ export class AIController {
           fields: { summary }
         }]
       })
+
+      // 4. Increment LLM calls
+      const email = req.user?.email
+      if (email != null) {
+        const incrementResult = await stripeService.incrementLlmCalls(email)
+        if (!incrementResult.success) {
+          console.warn(`[AIController] Failed to increment LLM calls for ${email}: ${incrementResult.error ?? 'Unknown error'}`)
+          // We don't block the response if incrementing fails, but we log it
+        }
+      }
 
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: updatedLink })
     } catch (error) {
@@ -131,6 +142,15 @@ export class AIController {
           fields: { chatHistory: newHistory } as any
         }]
       })
+
+      // 4. Increment LLM calls
+      const email = req.user?.email
+      if (email != null) {
+        const incrementResult = await stripeService.incrementLlmCalls(email)
+        if (!incrementResult.success) {
+          console.warn(`[AIController] Failed to increment LLM calls for ${email}: ${incrementResult.error ?? 'Unknown error'}`)
+        }
+      }
 
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: { answer: responseText, history: newHistory } })
     } catch (error) {

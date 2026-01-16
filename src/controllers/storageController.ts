@@ -378,23 +378,10 @@ export class storageController {
       if ('error' in userResult) {
         return res.json({ ...constants.API_FAIL_RESPONSE, error: 'Usuario no encontrado' })
       }
-      const quota = userResult.quota
+      const quota = userResult.quota ?? 0
+      const newQuota = Number(quota) + Number(diference)
 
-      if (quota === undefined) {
-        const newQuota = Number(newSize)
-        if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
-          return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
-        }
-        await userModel.editUser({ email, fields: { quota: newQuota } })
-        console.log('🚀 ~ storageController ~ uploadProfileImage ~ quota:', quota)
-      } else {
-        const newQuota = Number(quota) + Number(diference)
-        if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
-          return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
-        }
-        console.log('🚀 ~ storageController ~ uploadProfileImage ~ newQuota:', newQuota)
-        await userModel.editUser({ email, fields: { quota: newQuota } })
-      }
+      await userModel.editUser({ email, fields: { quota: newQuota } })
       const downloadURL = await getDownloadURL(snapshot.ref)
       try {
         await userModel.updateProfileImage({ profileImage: downloadURL, email })

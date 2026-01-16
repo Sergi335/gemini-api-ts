@@ -3,11 +3,6 @@ import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
 import { constants } from '../utils/constants'
 
-const SUPERUSER_EMAIL = process.env.SUPERUSER_EMAIL
-const MAX_USER_QUOTA = typeof process.env.MAX_USER_QUOTA === 'string' && process.env.MAX_USER_QUOTA.trim() !== ''
-  ? parseInt(process.env.MAX_USER_QUOTA, 10)
-  : 0
-
 const limitStorage = async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void> => {
   const userEmail = req.user?.email
   const file = req?.file
@@ -26,14 +21,6 @@ const limitStorage = async (req: RequestWithUser, res: Response, next: NextFunct
     return
   }
 
-  if (userEmail === SUPERUSER_EMAIL) {
-    console.log(`Superusuario ${userEmail} bypassed en limitStorage`)
-    return next()
-  }
-  // Placeholder for storage limiting logic
-  // This will involve checking user's current storage against MAX_USER_QUOTA
-  // and bypassing for SUPERUSER_EMAIL
-  console.log('Storage limiting middleware (placeholder)')
   // Actualizar la cuota del usuario
   const userResult = await userModel.getUser({ email: userEmail })
   if ('error' in userResult) {
@@ -42,9 +29,8 @@ const limitStorage = async (req: RequestWithUser, res: Response, next: NextFunct
   }
   const quota = userResult.quota ?? 0
   const newQuota = quota + file.size
-  if (newQuota > MAX_USER_QUOTA) {
-    res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
-  }
+
+  // Solo actualizamos la cuota del usuario, sin limitar el almacenamiento
   await userModel.editUser({ email: userEmail, fields: { quota: newQuota } })
   next()
 }

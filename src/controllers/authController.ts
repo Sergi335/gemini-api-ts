@@ -28,7 +28,9 @@ export class authController {
             status: 'free' as const,
             plan: 'FREE' as const,
             cancelAtPeriodEnd: false
-          }
+          },
+          llmCallsThisMonth: 0,
+          llmCallsResetAt: new Date()
         }
         const newUser = await userModel.createUser({ user })
         const test = await userModel.createDummyContent({ user: (newUser as any).email ?? '' })
@@ -70,6 +72,8 @@ export class authController {
             plan: 'FREE' as const,
             cancelAtPeriodEnd: false
           }
+          userData.llmCallsThisMonth = 0
+          userData.llmCallsResetAt = new Date()
           console.log(userData)
           const user = await userModel.createUser({ user: userData })
           let email = ''

@@ -479,7 +479,6 @@ export class storageControllerNew {
 
   static async uploadProfileImage (req: RequestWithUser, res: Response): Promise<Response> {
     const email = req.user?.email
-    const superUserEmail = process.env.SUPERUSER_EMAIL
 
     if (email === undefined || email === null || email === '') {
       return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
@@ -543,23 +542,10 @@ export class storageControllerNew {
         return res.json({ ...constants.API_FAIL_RESPONSE, error: 'Usuario no encontrado' })
       }
 
-      const quota = userResult.quota
+      const quota = userResult.quota ?? 0
+      const newQuota = Number(quota) + Number(difference)
 
-      if (email !== superUserEmail) {
-        if (quota === undefined) {
-          const newQuota = Number(newSize)
-          if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
-            return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
-          }
-          await userModel.editUser({ email, fields: { quota: newQuota } })
-        } else {
-          const newQuota = Number(quota) + Number(difference)
-          if (newQuota > Number(process.env.MAX_USER_QUOTA)) {
-            return res.json({ ...constants.API_FAIL_RESPONSE, error: 'No tienes espacio suficiente' })
-          }
-          await userModel.editUser({ email, fields: { quota: newQuota } })
-        }
-      }
+      await userModel.editUser({ email, fields: { quota: newQuota } })
 
       // Generar URL firmada para la imagen
       const signedUrl = await storageControllerNew.getSignedReadUrl(key)
