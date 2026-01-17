@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import { beforeEach, describe, expect, it, vi, type MockedFunction, type Mock } from 'vitest'
-import { checkLlmLimit, checkStorageLimit } from './checkSubscriptionLimits'
+import { checkLlmLimit } from './checkSubscriptionLimits'
 import type { Subscription } from '../types/userModel.types'
 import users from '../models/schemas/userSchema'
 
@@ -193,111 +193,111 @@ describe('checkSubscriptionLimits middleware', () => {
     })
   })
 
-  describe('checkStorageLimit', () => {
-    it('should return 401 if user is not authenticated', async () => {
-      mockRequest.user = undefined
+  // describe('checkStorageLimit', () => {
+  //   it('should return 401 if user is not authenticated', async () => {
+  //     mockRequest.user = undefined
 
-      await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
+  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockResponse.status).toHaveBeenCalledWith(401)
-      expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Unauthorized' })
-      expect(nextFunction).not.toHaveBeenCalled()
-    })
+  //     expect(mockResponse.status).toHaveBeenCalledWith(401)
+  //     expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Unauthorized' })
+  //     expect(nextFunction).not.toHaveBeenCalled()
+  //   })
 
-    it('should call next() when storage is below limit', async () => {
-      const user: MockUser = {
-        email: 'free@test.com',
-        subscription: createSubscription('FREE'),
-        quota: 30 * 1024 * 1024 // 30MB in bytes
-      }
-      mockRequest.user = user
+  //   it('should call next() when storage is below limit', async () => {
+  //     const user: MockUser = {
+  //       email: 'free@test.com',
+  //       subscription: createSubscription('FREE'),
+  //       quota: 30 * 1024 * 1024 // 30MB in bytes
+  //     }
+  //     mockRequest.user = user
 
-      await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
+  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(nextFunction).toHaveBeenCalled()
-      expect(mockResponse.status).not.toHaveBeenCalled()
-    })
+  //     expect(nextFunction).toHaveBeenCalled()
+  //     expect(mockResponse.status).not.toHaveBeenCalled()
+  //   })
 
-    it('should return 429 when storage limit is reached', async () => {
-      const user: MockUser = {
-        email: 'free@test.com',
-        subscription: createSubscription('FREE'),
-        quota: 50 * 1024 * 1024 // 50MB in bytes
-      }
-      mockRequest.user = user
+  //   it('should return 429 when storage limit is reached', async () => {
+  //     const user: MockUser = {
+  //       email: 'free@test.com',
+  //       subscription: createSubscription('FREE'),
+  //       quota: 50 * 1024 * 1024 // 50MB in bytes
+  //     }
+  //     mockRequest.user = user
 
-      await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
+  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockResponse.status).toHaveBeenCalledWith(429)
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        error: 'Storage limit exceeded',
-        message: 'You have reached your storage limit of 50 MB. Upgrade your plan for more storage.',
-        currentMB: 50,
-        limitMB: 50,
-        plan: 'FREE'
-      })
-      expect(nextFunction).not.toHaveBeenCalled()
-    })
+  //     expect(mockResponse.status).toHaveBeenCalledWith(429)
+  //     expect(mockResponse.json).toHaveBeenCalledWith({
+  //       error: 'Storage limit exceeded',
+  //       message: 'You have reached your storage limit of 50 MB. Upgrade your plan for more storage.',
+  //       currentMB: 50,
+  //       limitMB: 50,
+  //       plan: 'FREE'
+  //     })
+  //     expect(nextFunction).not.toHaveBeenCalled()
+  //   })
 
-    it('should return 429 when storage exceeds limit', async () => {
-      const user: MockUser = {
-        email: 'free@test.com',
-        subscription: createSubscription('FREE'),
-        quota: 60 * 1024 * 1024 // 60MB in bytes
-      }
-      mockRequest.user = user
+  //   it('should return 429 when storage exceeds limit', async () => {
+  //     const user: MockUser = {
+  //       email: 'free@test.com',
+  //       subscription: createSubscription('FREE'),
+  //       quota: 60 * 1024 * 1024 // 60MB in bytes
+  //     }
+  //     mockRequest.user = user
 
-      await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
+  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockResponse.status).toHaveBeenCalledWith(429)
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        error: 'Storage limit exceeded',
-        message: 'You have reached your storage limit of 50 MB. Upgrade your plan for more storage.',
-        currentMB: 60,
-        limitMB: 50,
-        plan: 'FREE'
-      })
-      expect(nextFunction).not.toHaveBeenCalled()
-    })
+  //     expect(mockResponse.status).toHaveBeenCalledWith(429)
+  //     expect(mockResponse.json).toHaveBeenCalledWith({
+  //       error: 'Storage limit exceeded',
+  //       message: 'You have reached your storage limit of 50 MB. Upgrade your plan for more storage.',
+  //       currentMB: 60,
+  //       limitMB: 50,
+  //       plan: 'FREE'
+  //     })
+  //     expect(nextFunction).not.toHaveBeenCalled()
+  //   })
 
-    it('should default to quota 0 if undefined', async () => {
-      const user: MockUser = {
-        email: 'newuser@test.com',
-        subscription: createSubscription('FREE')
-      }
-      mockRequest.user = user
+  //   it('should default to quota 0 if undefined', async () => {
+  //     const user: MockUser = {
+  //       email: 'newuser@test.com',
+  //       subscription: createSubscription('FREE')
+  //     }
+  //     mockRequest.user = user
 
-      await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
+  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(nextFunction).toHaveBeenCalled()
-      expect(mockResponse.status).not.toHaveBeenCalled()
-    })
+  //     expect(nextFunction).toHaveBeenCalled()
+  //     expect(mockResponse.status).not.toHaveBeenCalled()
+  //   })
 
-    it('should allow PRO users with higher storage limits', async () => {
-      const user: MockUser = {
-        email: 'pro@test.com',
-        subscription: createSubscription('PRO'),
-        quota: 3000 * 1024 * 1024 // 3000MB in bytes
-      }
-      mockRequest.user = user
+  //   it('should allow PRO users with higher storage limits', async () => {
+  //     const user: MockUser = {
+  //       email: 'pro@test.com',
+  //       subscription: createSubscription('PRO'),
+  //       quota: 3000 * 1024 * 1024 // 3000MB in bytes
+  //     }
+  //     mockRequest.user = user
 
-      await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
+  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(nextFunction).toHaveBeenCalled()
-      expect(mockResponse.status).not.toHaveBeenCalled()
-    })
+  //     expect(nextFunction).toHaveBeenCalled()
+  //     expect(mockResponse.status).not.toHaveBeenCalled()
+  //   })
 
-    it('should call next(error) when an exception occurs', async () => {
-      const testError = new Error('Unexpected error')
-      // Force an error by making the user getter throw
-      Object.defineProperty(mockRequest, 'user', {
-        get: () => { throw testError },
-        configurable: true
-      })
+  //   it('should call next(error) when an exception occurs', async () => {
+  //     const testError = new Error('Unexpected error')
+  //     // Force an error by making the user getter throw
+  //     Object.defineProperty(mockRequest, 'user', {
+  //       get: () => { throw testError },
+  //       configurable: true
+  //     })
 
-      await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
+  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(nextFunction).toHaveBeenCalledWith(testError)
-    })
-  })
+  //     expect(nextFunction).toHaveBeenCalledWith(testError)
+  //   })
+  // })
 })

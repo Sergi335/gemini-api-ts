@@ -246,7 +246,7 @@ describe('categoriesController', () => {
   describe('updateCategory', () => {
     it('actualiza una categoría exitosamente', async () => {
       const updateData = { name: 'Updated Category' }
-      mockRequest.body = { updates: [{ ...updateData, id: 'cat123' }] }
+      mockRequest.body = { updates: [{ fields: updateData, id: 'cat123' }] }
 
       const mockUpdatedCategory = [
         {
