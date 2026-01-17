@@ -281,22 +281,18 @@ export class linkModel {
       return { error: 'URL inválida' }
     }
     // const urlObj = new URL(url)
-    const dominio = 'sergiadn335@gmail.com/images/icons/'
+    const emailIconRegex = /[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}\/images\/icons\//
     const dominio2 = 't1.gstatic.com'
 
     let imagePath
 
-    if (url.includes(dominio)) {
+    if (emailIconRegex.test(url) || url.includes(dominio2)) {
       imagePath = url
-    }
-    if (url.includes(dominio2)) {
-      imagePath = url
-    }
-    if (!url.includes(dominio) && !url.includes(dominio2)) {
+    } else {
       imagePath = `/img/${url.split('/').pop() ?? ''}`
     }
     // const imagePath = (url.includes(dominio) || url.includes(dominio2)) ? url : `/img/${url.split('/').pop() ?? ''}`
-
+    console.log('🚀 ~ linkModel ~ setLinkImgInDb ~ imagePath:', imagePath)
     try {
       const userObjectId = new mongoose.Types.ObjectId(user)
       const linkObjectId = new mongoose.Types.ObjectId(id)

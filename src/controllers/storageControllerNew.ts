@@ -7,6 +7,7 @@ import { LinkFields, linkModel, ValidatedLinkData } from '../models/linkModel'
 import { userModel } from '../models/userModel'
 import { RequestWithUser } from '../types/express'
 import { constants } from '../utils/constants'
+// import { checkStorageLimit } from '../middlewares/checkSubscriptionLimits'
 
 // Configuración de Cloudflare R2
 const r2Client = new S3Client({
@@ -233,6 +234,10 @@ export class storageControllerNew {
     }
 
     try {
+      // const hasQuota = await checkStorageLimit(userId)
+      // if (hasQuota === undefined || hasQuota === null || hasQuota === false) {
+      //   return res.status(403).json({ ...constants.API_FAIL_RESPONSE, error: 'Has superado el límite de almacenamiento' })
+      // }
       const uniqueSuffix = Date.now().toString() + '-' + Math.round(Math.random() * 1E9).toString()
       const extension = (file.originalname.split('.').pop() ?? 'jpg')
       const key = `${user}/images/icons/${uniqueSuffix}.${extension}`

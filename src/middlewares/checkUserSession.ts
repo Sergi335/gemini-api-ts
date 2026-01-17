@@ -24,8 +24,8 @@ export const checkUserSession = async (req: RequestWithUser, res: Response, next
       return
     }
 
-    // Guarda el id y el nombre en req.user para el resto de la app
-    req.user = { _id: user._id?.toString?.() ?? '', email: userEmail, name: user.name ?? '' }
+    // Guarda el usuario en req.user para el resto de la app
+    req.user = user
     next()
   } catch (error) {
     console.log('Error desde el Middleware', error)

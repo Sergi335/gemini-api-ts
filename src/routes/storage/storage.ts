@@ -9,6 +9,7 @@ import {
   uploadImageBodySchema
 } from '../../middlewares/validation/validationSchemas'
 import { validateBody } from '../../middlewares/validation/zodValidator'
+import { checkStorageLimit } from '../../middlewares/checkSubscriptionLimits'
 
 const upload = multer()
 
@@ -30,17 +31,20 @@ storageRouter.post('/restorebackup',
 storageRouter.post('/image',
   upload.single('images'),
   limitStorage,
+  checkStorageLimit,
   validateBody(uploadImageBodySchema),
   storageControllerNew.uploadImage
 )
 storageRouter.post('/icon',
   upload.single('linkImg'),
   limitStorage,
+  checkStorageLimit,
   storageControllerNew.uploadIcon
 )
 storageRouter.post('/profilepic',
   upload.single('file'),
   limitStorage,
+  checkStorageLimit,
   storageControllerNew.uploadProfileImage
 )
 storageRouter.post('/signed-url', storageControllerNew.getSignedFileUrl)

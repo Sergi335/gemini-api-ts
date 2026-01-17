@@ -1,14 +1,9 @@
-// Extensión de los tipos de Express
 import { Request as ExpressRequest } from 'express'
+import { User } from './userModel.types'
 
 // Interfaz extendida que se puede importar
 export interface RequestWithUser extends ExpressRequest {
-  user?: {
-    _id?: string // optional id field
-    name: string
-    email?: string // optional email field
-    // add other user properties if needed
-  }
+  user?: User
   file?: Express.Multer.File
   body: any
 }
@@ -16,22 +11,12 @@ export interface RequestWithUser extends ExpressRequest {
 // Extensión global para compatibilidad futura (cuando ts-node-dev lo soporte mejor)
 declare module 'express-serve-static-core' {
   interface Request {
-    user?: {
-      name: string
-      email?: string // optional email field
-      _id?: string // optional id field
-      // add other user properties if needed
-    }
+    user?: User
     file?: Express.Multer.File
   }
 }
 
 // Re-exportar para compatibilidad
 export interface AuthenticatedRequest extends ExpressRequest {
-  user: {
-    name: string
-    email?: string // optional email field
-    _id?: string // optional id field
-    // add other user properties if needed
-  }
+  user: User
 }

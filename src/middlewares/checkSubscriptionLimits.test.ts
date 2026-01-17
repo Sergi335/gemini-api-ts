@@ -1,12 +1,14 @@
 import type { Request, Response } from 'express'
 import { beforeEach, describe, expect, it, vi, type MockedFunction, type Mock } from 'vitest'
 import { checkLlmLimit, checkStorageLimit } from './checkSubscriptionLimits'
-import * as stripeService from '../services/stripeService'
 import type { Subscription } from '../types/userModel.types'
+import users from '../models/schemas/userSchema'
 
-// Mock the stripeService module
-vi.mock('../services/stripeService', () => ({
-  incrementLlmCalls: vi.fn()
+// Mock the userSchema module
+vi.mock('../models/schemas/userSchema', () => ({
+  default: {
+    findOne: vi.fn()
+  }
 }))
 
 // Mock the stripeConfig module to avoid Stripe initialization issues
@@ -41,13 +43,15 @@ interface MockUser {
   name?: string
   subscription?: Subscription
   quota?: number
+  llmCallsThisMonth?: number
+  llmCallsResetAt?: Date
 }
 
 describe('checkSubscriptionLimits middleware', () => {
   let mockRequest: { user?: MockUser }
   let mockResponse: Partial<Response>
   let nextFunction: Mock
-  let mockIncrementLlmCalls: MockedFunction<typeof stripeService.incrementLlmCalls>
+  let mockFindOne: MockedFunction<any>
 
   beforeEach(() => {
     mockRequest = {}
@@ -56,7 +60,7 @@ describe('checkSubscriptionLimits middleware', () => {
       json: vi.fn().mockReturnThis()
     }
     nextFunction = vi.fn()
-    mockIncrementLlmCalls = stripeService.incrementLlmCalls as MockedFunction<typeof stripeService.incrementLlmCalls>
+    mockFindOne = users.findOne as MockedFunction<any>
     vi.clearAllMocks()
   })
 
@@ -81,7 +85,7 @@ describe('checkSubscriptionLimits middleware', () => {
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
       expect(nextFunction).toHaveBeenCalled()
-      expect(mockIncrementLlmCalls).not.toHaveBeenCalled()
+      expect(mockFindOne).not.toHaveBeenCalled()
       expect(mockResponse.status).not.toHaveBeenCalled()
     })
 
@@ -92,14 +96,15 @@ describe('checkSubscriptionLimits middleware', () => {
       }
       mockRequest.user = user
 
-      mockIncrementLlmCalls.mockResolvedValue({
-        success: true,
-        data: { count: 5, limit: 20 }
+      mockFindOne.mockResolvedValue({
+        llmCallsThisMonth: 5,
+        llmCallsResetAt: new Date(),
+        email: 'free@test.com'
       })
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockIncrementLlmCalls).toHaveBeenCalledWith('free@test.com')
+      expect(mockFindOne).toHaveBeenCalledWith({ email: 'free@test.com' })
       expect(nextFunction).toHaveBeenCalled()
       expect(mockResponse.status).not.toHaveBeenCalled()
     })
@@ -111,14 +116,15 @@ describe('checkSubscriptionLimits middleware', () => {
       }
       mockRequest.user = user
 
-      mockIncrementLlmCalls.mockResolvedValue({
-        success: false,
-        error: 'LLM call limit exceeded'
+      mockFindOne.mockResolvedValue({
+        llmCallsThisMonth: 20,
+        llmCallsResetAt: new Date(),
+        email: 'free@test.com'
       })
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockIncrementLlmCalls).toHaveBeenCalledWith('free@test.com')
+      expect(mockFindOne).toHaveBeenCalledWith({ email: 'free@test.com' })
       expect(mockResponse.status).toHaveBeenCalledWith(429)
       expect(mockResponse.json).toHaveBeenCalledWith({
         error: 'LLM call limit exceeded',
@@ -135,15 +141,40 @@ describe('checkSubscriptionLimits middleware', () => {
       }
       mockRequest.user = user
 
-      mockIncrementLlmCalls.mockResolvedValue({
-        success: true,
-        data: { count: 1, limit: 20 }
+      mockFindOne.mockResolvedValue({
+        llmCallsThisMonth: 1,
+        llmCallsResetAt: new Date(),
+        email: 'noplan@test.com'
       })
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockIncrementLlmCalls).toHaveBeenCalledWith('noplan@test.com')
+      expect(mockFindOne).toHaveBeenCalledWith({ email: 'noplan@test.com' })
       expect(nextFunction).toHaveBeenCalled()
+    })
+
+    it('should allow if new month reset applies', async () => {
+      const user: MockUser = {
+        email: 'reset@test.com',
+        subscription: createSubscription('FREE')
+      }
+      mockRequest.user = user
+
+      // Date from last month
+      const lastMonth = new Date()
+      lastMonth.setMonth(lastMonth.getMonth() - 1)
+
+      mockFindOne.mockResolvedValue({
+        llmCallsThisMonth: 25, // Over limit
+        llmCallsResetAt: lastMonth,
+        email: 'reset@test.com'
+      })
+
+      await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
+
+      expect(mockFindOne).toHaveBeenCalledWith({ email: 'reset@test.com' })
+      expect(nextFunction).toHaveBeenCalled()
+      expect(mockResponse.status).not.toHaveBeenCalled()
     })
 
     it('should call next(error) when an exception occurs', async () => {
@@ -154,7 +185,7 @@ describe('checkSubscriptionLimits middleware', () => {
       }
       mockRequest.user = user
 
-      mockIncrementLlmCalls.mockRejectedValue(testError)
+      mockFindOne.mockRejectedValue(testError)
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
@@ -177,7 +208,7 @@ describe('checkSubscriptionLimits middleware', () => {
       const user: MockUser = {
         email: 'free@test.com',
         subscription: createSubscription('FREE'),
-        quota: 30
+        quota: 30 * 1024 * 1024 // 30MB in bytes
       }
       mockRequest.user = user
 
@@ -191,7 +222,7 @@ describe('checkSubscriptionLimits middleware', () => {
       const user: MockUser = {
         email: 'free@test.com',
         subscription: createSubscription('FREE'),
-        quota: 50
+        quota: 50 * 1024 * 1024 // 50MB in bytes
       }
       mockRequest.user = user
 
@@ -212,7 +243,7 @@ describe('checkSubscriptionLimits middleware', () => {
       const user: MockUser = {
         email: 'free@test.com',
         subscription: createSubscription('FREE'),
-        quota: 60
+        quota: 60 * 1024 * 1024 // 60MB in bytes
       }
       mockRequest.user = user
 
@@ -246,7 +277,7 @@ describe('checkSubscriptionLimits middleware', () => {
       const user: MockUser = {
         email: 'pro@test.com',
         subscription: createSubscription('PRO'),
-        quota: 3000
+        quota: 3000 * 1024 * 1024 // 3000MB in bytes
       }
       mockRequest.user = user
 

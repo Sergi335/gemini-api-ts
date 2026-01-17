@@ -9,6 +9,7 @@ import {
   updateLinkBodySchema
 } from '../../middlewares/validation/validationSchemas'
 import { validateBody, validateParams, validateQuery } from '../../middlewares/validation/zodValidator'
+import { checkLlmLimit } from '../../middlewares/checkSubscriptionLimits'
 
 export const linksRouter = Express.Router()
 
@@ -46,8 +47,8 @@ linksRouter.post('/',
   validateBody(createLinkBodySchema),
   linksController.createLink
 )
-linksRouter.post('/:id/ai/summary', validateParams(linkIdParamsSchema), AIController.summarizeLink)
-linksRouter.post('/:id/ai/chat', validateParams(linkIdParamsSchema), AIController.chatWithLink) // Add body validation if needed
+linksRouter.post('/:id/ai/summary', validateParams(linkIdParamsSchema), checkLlmLimit, AIController.summarizeLink)
+linksRouter.post('/:id/ai/chat', validateParams(linkIdParamsSchema), checkLlmLimit, AIController.chatWithLink) // Add body validation if needed
 linksRouter.delete('/:id/ai', validateParams(linkIdParamsSchema), AIController.deleteSummaryAndChat)
 linksRouter.delete('/:id/ai/summary', validateParams(linkIdParamsSchema), AIController.deleteSummary)
 linksRouter.delete('/:id/ai/chat', validateParams(linkIdParamsSchema), AIController.deleteChat)

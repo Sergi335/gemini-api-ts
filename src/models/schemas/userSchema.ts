@@ -70,7 +70,8 @@ const UsersSchema = new Schema({
     type: Date
   },
   quota: {
-    type: Number
+    type: Number,
+    default: 0
   },
   weatherCity: {
     type: String

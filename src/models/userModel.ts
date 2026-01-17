@@ -32,7 +32,7 @@ export class userModel {
           _id: String(data._id),
           email: data.email ?? '',
           name: data.name ?? '',
-          quota: data.quota ?? 0,
+          quota: data.quota != null ? Number(data.quota) : 0,
           profileImage: data.profileImage ?? '',
           realName: data.realName ?? '',
           newUser: data.newUser ?? false,
@@ -40,7 +40,11 @@ export class userModel {
           googleId: data.googleId ?? '',
           webSite: data.website ?? '',
           aboutMe: data.aboutMe ?? '',
-          lastBackupUrl: data.lastBackupUrl ?? ''
+          lastBackupUrl: data.lastBackupUrl ?? '',
+          stripeCustomerId: data.stripeCustomerId,
+          subscription: data.subscription,
+          llmCallsThisMonth: data.llmCallsThisMonth,
+          llmCallsResetAt: data.llmCallsResetAt
         }
         return userData
       } else {
