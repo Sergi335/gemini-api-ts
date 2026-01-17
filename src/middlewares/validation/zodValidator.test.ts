@@ -1,16 +1,22 @@
 import { Request, Response } from 'express'
 import { beforeEach, describe, expect, it, MockedFunction, vi } from 'vitest'
 import { z } from 'zod'
+import { RequestWithUser } from '../../types/express'
 import { createCategoryBodySchema } from './validationSchemas'
 import { validateBody, validateUser } from './zodValidator'
 
 describe('zodValidator middleware', () => {
-  let mockRequest: Partial<Request>
+  let mockRequest: Partial<RequestWithUser>
   let mockResponse: Partial<Response>
   let nextFunction: MockedFunction<any>
 
   beforeEach(() => {
-    mockRequest = {}
+    mockRequest = {
+      body: {},
+      params: {},
+      query: {},
+      headers: {}
+    }
     mockResponse = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis()
@@ -69,7 +75,7 @@ describe('zodValidator middleware', () => {
 
   describe('validateUser', () => {
     it('should pass with valid user', () => {
-      mockRequest.user = { name: 'testuser' }
+      mockRequest.user = { _id: '123', email: 'test@example.com', name: 'testuser' }
 
       validateUser(mockRequest, mockResponse as Response, nextFunction)
 

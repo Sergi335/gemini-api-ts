@@ -1,5 +1,5 @@
 import { Response } from 'express'
-import mongoose, { Types } from 'mongoose'
+import { Types } from 'mongoose'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { categoryModel } from '../models/categoryModel'
 import { RequestWithUser } from '../types/express'
@@ -19,7 +19,7 @@ describe('categoriesController', () => {
     vi.clearAllMocks()
 
     mockRequest = {
-      user: { _id: mockUserId, name: 'testuser' },
+      user: { _id: mockUserId, email: 'test@example.com', name: 'testuser' },
       body: {},
       params: {},
       query: {}
@@ -50,7 +50,7 @@ describe('categoriesController', () => {
     })
 
     it('devuelve 400 si updates es un array vacío', async () => {
-      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.user = { _id: mockUserId, email: 'test@example.com', name: 'testuser' }
       mockRequest.body = { updates: [] }
 
       await categoriesController.updateCategory(
@@ -67,7 +67,7 @@ describe('categoriesController', () => {
 
     it('devuelve 404 si la categoría no existe', async () => {
       vi.mocked(categoryModel.updateCategory).mockResolvedValueOnce({ error: 'La categoría no existe' })
-      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.user = { _id: mockUserId, email: 'test@example.com', name: 'testuser' }
       mockRequest.body = { updates: [{ id: 'cat999', name: 'No existe' }] }
 
       await categoriesController.updateCategory(
@@ -84,7 +84,7 @@ describe('categoriesController', () => {
 
     it('devuelve 500 si el modelo lanza una excepción', async () => {
       vi.mocked(categoryModel.updateCategory).mockRejectedValueOnce(new Error('Error inesperado'))
-      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.user = { _id: mockUserId, email: 'test@example.com', name: 'testuser' }
       mockRequest.body = { updates: [{ id: 'cat123', name: 'Updated Category' }] }
 
       await categoriesController.updateCategory(
@@ -103,9 +103,9 @@ describe('categoriesController', () => {
       const results = [
         { id: 'cat999', error: 'La categoría no existe' },
         { id: 'cat123', name: 'Actualizada' }
-      ] as unknown as Array<mongoose.Document | { id: string | undefined, error: string }>
-      vi.mocked(categoryModel.updateCategory).mockResolvedValueOnce(results)
-      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      ]
+      vi.mocked(categoryModel.updateCategory).mockResolvedValueOnce(results as any)
+      mockRequest.user = { _id: mockUserId, email: 'test@example.com', name: 'testuser' }
       mockRequest.body = { updates: [{ id: 'cat999', name: 'No existe' }, { id: 'cat123', name: 'Actualizada' }] }
 
       await categoriesController.updateCategory(
@@ -124,7 +124,7 @@ describe('categoriesController', () => {
   describe('deleteCategory - casos límite y errores', () => {
     it('devuelve 404 si la categoría a eliminar no existe', async () => {
       vi.mocked(categoryModel.deleteCategory).mockResolvedValueOnce({ error: 'No existe' })
-      mockRequest.user = { _id: mockUserId, name: 'testuser' }
+      mockRequest.user = { _id: mockUserId, email: 'test@example.com', name: 'testuser' }
       mockRequest.body = { id: 'cat999' }
 
       await categoriesController.deleteCategory(
@@ -246,14 +246,15 @@ describe('categoriesController', () => {
   describe('updateCategory', () => {
     it('actualiza una categoría exitosamente', async () => {
       const updateData = { name: 'Updated Category' }
-      // El controlador espera 'fields' y 'id' en el body
       mockRequest.body = { updates: [{ ...updateData, id: 'cat123' }] }
 
-      const mockUpdatedCategory = {
-        _id: 'cat123',
-        ...updateData,
-        user: mockUserId
-      }
+      const mockUpdatedCategory = [
+        {
+          _id: 'cat123',
+          ...updateData,
+          user: mockUserId
+        }
+      ]
 
       vi.mocked(categoryModel.updateCategory).mockResolvedValue(mockUpdatedCategory as any)
 
@@ -267,10 +268,10 @@ describe('categoriesController', () => {
           {
             user: mockUserId,
             id: 'cat123',
-            name: updateData.name,
-            elements: undefined
+            fields: {
+              name: updateData.name
+            }
           }
-
         ]
       })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
@@ -283,7 +284,6 @@ describe('categoriesController', () => {
 
   describe('deleteCategory', () => {
     it('elimina una categoría exitosamente', async () => {
-      // El controlador espera 'id' en el body
       mockRequest.body = { id: 'cat123' }
 
       const mockDeletedCategory = {
@@ -301,7 +301,8 @@ describe('categoriesController', () => {
 
       expect(categoryModel.deleteCategory).toHaveBeenCalledWith({
         id: 'cat123',
-        user: mockUserId
+        user: mockUserId,
+        level: undefined
       })
       expect(mockResponse.status).toHaveBeenCalledWith(200)
       expect(mockResponse.json).toHaveBeenCalledWith({
