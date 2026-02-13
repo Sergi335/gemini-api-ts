@@ -155,7 +155,7 @@ describe('Categories Integration Tests', () => {
         .expect(200)
 
       expect(response.body.success).toBe(true)
-      expect(response.body.data).toEqual({ error: 'No se encontraron categorías' })
+      expect(response.body.data).toEqual([])
     })
   })
 

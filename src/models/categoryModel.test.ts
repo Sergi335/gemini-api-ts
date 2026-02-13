@@ -49,7 +49,7 @@ describe('categoryModel', () => {
         sort: vi.fn().mockResolvedValue([])
       } as any)
       const result = await categoryModel.getAllCategories({ user: mockUserId })
-      expect(result).toEqual({ error: 'No se encontraron categorías' })
+      expect(result).toEqual([])
     })
   })
 
