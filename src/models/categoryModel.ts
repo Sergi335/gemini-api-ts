@@ -30,14 +30,14 @@ export interface NewValidatedCategoryData extends CategoryFields {
 
 /* eslint-disable @typescript-eslint/no-extraneous-class */
 export class categoryModel {
-  static async getAllCategories ({ user }: ValidatedCategoryData): Promise<mongoose.Document[] | CategoryErrorResponse> {
+  static async getAllCategories ({ user }: ValidatedCategoryData): Promise<mongoose.Document[] | []> {
     const objectIdUser = new mongoose.Types.ObjectId(user)
     const data = await category.find({ user: objectIdUser }).sort({ order: 1 })
 
     if (data.length > 0) {
       return data
     } else {
-      return { error: 'No se encontraron categorías' }
+      return []
     }
   }
 
