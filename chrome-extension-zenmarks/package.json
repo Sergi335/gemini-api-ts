@@ -1,9 +1,0 @@
-{
-  "name": "zenmarks-chrome-extension",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Skeleton de extensión Chrome para consumir gemini-api-ts (Zenmarks API)",
-  "scripts": {
-    "zip": "rm -f extension.zip && zip -r extension.zip manifest.json src"
-  }
-}

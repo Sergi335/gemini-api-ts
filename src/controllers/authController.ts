@@ -7,14 +7,12 @@ export class authController {
   // Gestiona el inicio de sesión/registro con la cuenta de google
   static async googleLogin (req: Request, res: Response): Promise<void> {
     if (req.body.email !== undefined && req.body.email !== null && req.body.email !== '') {
-      const user = await userModel.getUser({ email: req.body.email }) // Solo está sergiadn335@gmail.com
-      // console.log(user)
+      const user = await userModel.getUser({ email: req.body.email })
       if (!('error' in user) && user._id !== undefined && user._id !== null) {
         res.send({ ...user, csrfToken: res.locals.csrfToken ?? '' })
       } else {
         const googleUser = await getAuth().getUser(req.body.uid)
         const nickname = googleUser.displayName ?? `user${Math.floor(Math.random() * 10000000000)}`
-        console.log(googleUser)
         const user = {
           name: nickname,
           realName: googleUser.displayName,
@@ -33,8 +31,8 @@ export class authController {
           llmCallsResetAt: new Date()
         }
         const newUser = await userModel.createUser({ user })
-        const test = await userModel.createDummyContent({ user: (newUser as any).email ?? '' })
-        console.log('🚀 ~ file: authController.js:42 ~ usersController ~ googleLogin ~ test:', test)
+        // const test = await userModel.createDummyContent({ user: (newUser as any).email ?? '' })
+        // console.log('🚀 ~ file: authController.js:42 ~ usersController ~ googleLogin ~ test:', test)
 
         // res.send({ message: 'Usuario creado correctamente', newUser })
         res.send(newUser)
