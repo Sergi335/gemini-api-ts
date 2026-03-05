@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Zenmarks API Companion",
+  "description": "Esqueleto de extensión para Chrome que consume la API de Zenmarks.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Zenmarks",
+    "default_popup": "src/popup/popup.html"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://zenmarks-api.onrender.com/*"
+  ],
+  "options_page": "src/options/options.html"
+}

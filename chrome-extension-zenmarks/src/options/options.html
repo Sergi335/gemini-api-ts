@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Opciones Zenmarks</title>
+  </head>
+  <body>
+    <main>
+      <h1>Opciones</h1>
+
+      <label>
+        API Base URL
+        <input id="apiBaseUrl" type="url" placeholder="https://zenmarks-api.onrender.com" />
+      </label>
+
+      <label>
+        Firebase ID Token
+        <textarea id="idToken" rows="6" placeholder="Pega aquí un idToken de Firebase"></textarea>
+      </label>
+
+      <button id="save" type="button">Guardar</button>
+      <pre id="result"></pre>
+    </main>
+    <script type="module" src="./options.js"></script>
+  </body>
+</html>
