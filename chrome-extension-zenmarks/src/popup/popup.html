@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zenmarks</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Zenmarks</h1>
+      <p class="hint">Guarda la pestaña actual usando la API.</p>
+
+      <label>
+        Título
+        <input id="title" type="text" placeholder="Título del link" />
+      </label>
+
+      <label>
+        URL
+        <input id="url" type="url" placeholder="https://..." />
+      </label>
+
+      <label>
+        Categoría (ID)
+        <input id="categoryId" type="text" placeholder="Mongo ObjectId" />
+      </label>
+
+      <div class="actions">
+        <button id="prefillTab" type="button">Usar pestaña actual</button>
+        <button id="createLink" type="button">Crear link</button>
+      </div>
+
+      <div class="actions">
+        <button id="refreshCsrf" type="button">Refrescar CSRF</button>
+        <button id="login" type="button">Login</button>
+      </div>
+
+      <button id="openOptions" type="button">Abrir opciones</button>
+
+      <pre id="status"></pre>
+    </main>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>
