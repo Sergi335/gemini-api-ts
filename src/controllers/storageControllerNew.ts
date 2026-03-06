@@ -90,7 +90,7 @@ export class storageControllerNew {
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: backgrounds })
     } catch (err) {
       console.error('Error al leer la carpeta:', err)
-      return res.status(500).json({ ...constants.API_FAIL_RESPONSE })
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, message: 'Fallo al obtener las miniaturas' })
     }
   }
 
@@ -354,7 +354,7 @@ export class storageControllerNew {
       return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: userIcons })
     } catch (err) {
       console.error('Error al leer la carpeta:', err)
-      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al leer la carpeta' })
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, message: 'Fallo al obtener los iconos' })
     }
   }
 
