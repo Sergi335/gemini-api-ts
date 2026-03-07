@@ -99,7 +99,15 @@ export class linkModel {
 
   static async createLink ({ cleanData }: { cleanData: ValidatedLinkData }): Promise<mongoose.Document> {
     console.log('🚀 ~ linkModel ~ createLink ~ cleanData:', cleanData)
-
+    // Si order no se especifica, asignar el siguiente número de orden disponible en la categoría
+    if (cleanData.order === undefined && cleanData.categoryId !== undefined) {
+      console.log('no viene con orden')
+      const user = cleanData.user ?? ''
+      const category = cleanData.categoryId
+      const maxOrderLink = await link.findOne({ user, categoryId: category }).sort({ order: -1 }).select('order')
+      const nextOrder = maxOrderLink !== null && maxOrderLink !== undefined ? (maxOrderLink.order ?? 0) + 1 : 0
+      cleanData.order = nextOrder
+    }
     // gestionar errores aqui --- ver node midu
     const data = await link.create({ ...cleanData })
     console.log('🚀 ~ linkModel ~ createLink ~ data:', data)
