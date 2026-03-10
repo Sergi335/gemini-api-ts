@@ -146,7 +146,7 @@ export class storageControllerNew {
       }
     } catch (error) {
       console.error('Error al subir el archivo:', error)
-      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Error al subir el archivo' })
+      return res.status(500).json({ ...constants.API_FAIL_RESPONSE, message: 'Error al subir el archivo' })
     }
   }
 
