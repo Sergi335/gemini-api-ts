@@ -58,6 +58,11 @@ export class AIService {
         model: this.getModelName(),
         contents
       })
+      const countTokensResponse = await ai.models.generateContent({
+        model: this.getModelName(),
+        contents: YOUTUBE_SUMMARY_PROMPT
+      })
+      console.log(`[AIService] Token count for prompt: ${countTokensResponse.usageMetadata?.totalTokenCount ?? 0} tokens.`)
 
       if (response.text === undefined) {
         throw new Error('Failed to generate video summary')

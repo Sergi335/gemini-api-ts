@@ -311,4 +311,33 @@ describe('categoriesController', () => {
       })
     })
   })
+  describe('createCategory - subscription limits', () => {
+    it('devuelve 403 si el usuario FREE ya tiene 20 categorias', async () => {
+      mockRequest.user = {
+        _id: mockUserId,
+        email: 'test@example.com',
+        name: 'testuser',
+        subscription: {
+          status: 'free',
+          plan: 'FREE',
+          cancelAtPeriodEnd: false
+        }
+      }
+      mockRequest.body = { name: 'Otra categoria' }
+
+      vi.mocked(categoryModel.getCategoryCount).mockResolvedValue(20)
+
+      await categoriesController.createCategory(
+        mockRequest as RequestWithUser,
+        mockResponse as Response
+      )
+
+      expect(categoryModel.createCategory).not.toHaveBeenCalled()
+      expect(mockResponse.status).toHaveBeenCalledWith(403)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        ...constants.API_FAIL_RESPONSE,
+        error: 'Límite de categorías alcanzado, actualiza al plan PRO para crear más.'
+      })
+    })
+  })
 })

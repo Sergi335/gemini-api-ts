@@ -443,4 +443,28 @@ describe('Categories Integration Tests', () => {
       expect(userCategories.every(cat => cat.user?.toString() === testUserId)).toBe(true)
     })
   })
+  describe('POST /categories - subscription limits', () => {
+    it('deberia rechazar crear mas categorias si el usuario FREE ya tiene 20', async () => {
+      const extraCategories = Array.from({ length: 16 }, (_, index) => ({
+        name: `Extra ${index}`,
+        slug: `extra-${index}`,
+        level: 0,
+        order: index + 10,
+        user: testUserId,
+        parentId: null,
+        parentSlug: null
+      }))
+      await category.insertMany(extraCategories)
+
+      const response = await authenticatedRequest('post', '/categories')
+        .send({
+          name: 'Categoria 21',
+          order: 99
+        })
+        .expect(403)
+
+      expect(response.body.success).toBe(false)
+      expect(response.body.error).toBe('Límite de categorías alcanzado, actualiza al plan PRO para crear más.')
+    })
+  })
 })

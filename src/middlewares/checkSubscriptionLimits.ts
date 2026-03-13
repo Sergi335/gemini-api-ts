@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 
 import { PLANS, type PlanName } from '../config/stripeConfig'
 import type { User } from '../types/userModel.types'
-import users from '../models/schemas/userSchema'
+import { getAiAccessDecision } from '../services/stripeService'
 
 /**
  * Middleware to check LLM call limits based on subscription plan
@@ -19,37 +19,18 @@ export async function checkLlmLimit (
       return
     }
 
-    const plan: PlanName = (user.subscription?.plan as PlanName) ?? 'FREE'
-    const limit = PLANS[plan].limits.llmCallsPerMonth
-
-    // -1 means unlimited
-    if (limit === -1) {
-      next()
+    const aiAccess = await getAiAccessDecision(user.email)
+    if (!aiAccess.success || aiAccess.data == null) {
+      res.status(500).json({ error: aiAccess.error ?? 'Error checking AI access' })
       return
     }
 
-    // Check database for current calls
-    const dbUser = await users.findOne({ email: user.email })
-    if (dbUser == null) {
-      res.status(401).json({ error: 'User not found' })
-      return
-    }
-
-    const now = new Date()
-    const resetAt = dbUser.llmCallsResetAt
-    let currentCount = dbUser.llmCallsThisMonth ?? 0
-
-    // Reset logic: if it's a new month, treat count as 0
-    if (resetAt == null || now.getMonth() !== resetAt.getMonth() || now.getFullYear() !== resetAt.getFullYear()) {
-      currentCount = 0
-    }
-
-    if (currentCount >= limit) {
-      res.status(429).json({
-        error: 'LLM call limit exceeded',
-        message: `You have reached your monthly limit of ${limit} LLM calls. Upgrade your plan for more.`,
-        limit,
-        plan
+    if (!aiAccess.data.allowed) {
+      res.status(aiAccess.data.statusCode ?? 403).json({
+        error: 'AI access denied',
+        message: aiAccess.data.message,
+        limit: aiAccess.data.limit,
+        plan: aiAccess.data.plan
       })
       return
     }

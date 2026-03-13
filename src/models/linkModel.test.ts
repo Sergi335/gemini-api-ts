@@ -98,11 +98,17 @@ describe('linkModel', () => {
     it('crea un link correctamente', async () => {
       const cleanData: CreateLinkData = { name: 'New Link', url: 'https://example.com', user: mockUserId, categoryId: mockCategoryId }
       const mockCreated = { _id: mockLinkId, ...cleanData }
+      vi.mocked(link.findOne).mockReturnValue({
+        sort: vi.fn().mockReturnValue({
+          select: vi.fn().mockResolvedValue(null)
+        })
+      } as any)
       vi.mocked(link.create).mockResolvedValue(mockCreated as any)
 
       const result = await linkModel.createLink({ cleanData })
 
-      expect(link.create).toHaveBeenCalledWith({ ...cleanData })
+      expect(link.findOne).toHaveBeenCalledWith({ user: mockUserId, categoryId: mockCategoryId })
+      expect(link.create).toHaveBeenCalledWith({ ...cleanData, order: 0 })
       expect(result).toEqual(mockCreated)
     })
   })

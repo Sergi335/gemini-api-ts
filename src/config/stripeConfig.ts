@@ -23,11 +23,11 @@ export interface Plan {
 export const PLANS: Record<PlanName, Plan> = {
   FREE: {
     priceId: null,
-    limits: { storageMB: 50, llmCallsPerMonth: 20 }
+    limits: { storageMB: 50, llmCallsPerMonth: 0 }
   },
   PRO: {
     priceId: process.env.STRIPE_PRICE_ID_PRO ?? null,
-    limits: { storageMB: 5120, llmCallsPerMonth: 500 }
+    limits: { storageMB: 5120, llmCallsPerMonth: 200 }
   },
   ENTERPRISE: {
     priceId: process.env.STRIPE_PRICE_ID_ENTERPRISE ?? null,

@@ -31,8 +31,8 @@ vi.mock('../config/stripeConfig', () => {
     },
     // Mock PLANS and helpers usually exported
     PLANS: {
-      FREE: { limits: { storageMB: 50, llmCallsPerMonth: 20 } },
-      PRO: { limits: { storageMB: 5120, llmCallsPerMonth: 500 } },
+      FREE: { limits: { storageMB: 50, llmCallsPerMonth: 0 } },
+      PRO: { limits: { storageMB: 5120, llmCallsPerMonth: 200 } },
       ENTERPRISE: { limits: { storageMB: 51200, llmCallsPerMonth: -1 } }
     },
     getPlanByPriceId: (priceId: string) => {
@@ -41,8 +41,8 @@ vi.mock('../config/stripeConfig', () => {
       return null
     },
     getPlanLimits: (plan: string) => {
-      if (plan === 'PRO') return { storageMB: 5120, llmCallsPerMonth: 500 }
-      return { storageMB: 50, llmCallsPerMonth: 20 }
+      if (plan === 'PRO') return { storageMB: 5120, llmCallsPerMonth: 200 }
+      return { storageMB: 50, llmCallsPerMonth: 0 }
     }
   }
 })
@@ -285,6 +285,68 @@ describe('Stripe Service', () => {
 
       const event = stripeService.constructWebhookEvent(Buffer.from('test'), 'sig')
       expect(event).toBe(mockEvent)
+    })
+  })
+
+  describe('getAiAccessDecision', () => {
+    it('should block FREE users from AI access', async () => {
+      vi.mocked(users.findOne).mockResolvedValue({
+        email: 'free@test.com',
+        subscription: { plan: 'FREE' },
+        llmCallsThisMonth: 0,
+        llmCallsResetAt: new Date()
+      })
+
+      const result = await stripeService.getAiAccessDecision('free@test.com')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.allowed).toBe(false)
+      expect(result.data?.plan).toBe('FREE')
+      expect(result.data?.limit).toBe(0)
+    })
+
+    it('should block PRO users when billing-period limit is reached', async () => {
+      const nextPeriodEnd = new Date()
+      nextPeriodEnd.setMonth(nextPeriodEnd.getMonth() + 1)
+
+      vi.mocked(users.findOne).mockResolvedValue({
+        email: 'pro@test.com',
+        subscription: { plan: 'PRO', currentPeriodEnd: nextPeriodEnd },
+        llmCallsThisMonth: 200,
+        llmCallsResetAt: new Date()
+      })
+
+      const result = await stripeService.getAiAccessDecision('pro@test.com')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.allowed).toBe(false)
+      expect(result.data?.plan).toBe('PRO')
+      expect(result.data?.limit).toBe(200)
+    })
+
+    it('should persist reset when a new billing period has started', async () => {
+      const nextPeriodEnd = new Date()
+      nextPeriodEnd.setMonth(nextPeriodEnd.getMonth() + 1)
+      const previousPeriodReset = new Date()
+      previousPeriodReset.setMonth(previousPeriodReset.getMonth() - 2)
+
+      vi.mocked(users.findOne).mockResolvedValue({
+        email: 'pro@test.com',
+        subscription: { plan: 'PRO', currentPeriodEnd: nextPeriodEnd },
+        llmCallsThisMonth: 150,
+        llmCallsResetAt: previousPeriodReset
+      })
+
+      const result = await stripeService.getLlmUsageStatus('pro@test.com')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.currentCount).toBe(0)
+      expect(users.findOneAndUpdate).toHaveBeenCalledWith(
+        { email: 'pro@test.com' },
+        expect.objectContaining({
+          llmCallsThisMonth: 0
+        })
+      )
     })
   })
 })

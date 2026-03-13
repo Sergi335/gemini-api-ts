@@ -26,6 +26,7 @@ export interface User {
   subscription?: Subscription
   llmCallsThisMonth?: number
   llmCallsResetAt?: Date
+  createdAt?: Date
 }
 
 export interface UserUpdateFields {

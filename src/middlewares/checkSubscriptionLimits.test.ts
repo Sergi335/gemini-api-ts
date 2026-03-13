@@ -1,26 +1,20 @@
 import type { Request, Response } from 'express'
-import { beforeEach, describe, expect, it, vi, type MockedFunction, type Mock } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { checkLlmLimit } from './checkSubscriptionLimits'
-import type { Subscription } from '../types/userModel.types'
-import users from '../models/schemas/userSchema'
 
-// Mock the userSchema module
-vi.mock('../models/schemas/userSchema', () => ({
-  default: {
-    findOne: vi.fn()
-  }
+vi.mock('../services/stripeService', () => ({
+  getAiAccessDecision: vi.fn()
 }))
 
-// Mock the stripeConfig module to avoid Stripe initialization issues
 vi.mock('../config/stripeConfig', () => ({
   PLANS: {
     FREE: {
       priceId: null,
-      limits: { storageMB: 50, llmCallsPerMonth: 20 }
+      limits: { storageMB: 50, llmCallsPerMonth: 0 }
     },
     PRO: {
       priceId: 'price_pro',
-      limits: { storageMB: 5120, llmCallsPerMonth: 500 }
+      limits: { storageMB: 5120, llmCallsPerMonth: 200 }
     },
     ENTERPRISE: {
       priceId: 'price_enterprise',
@@ -29,45 +23,25 @@ vi.mock('../config/stripeConfig', () => ({
   }
 }))
 
-// Helper to create a valid subscription object
-function createSubscription (plan: 'FREE' | 'PRO' | 'ENTERPRISE'): Subscription {
-  return {
-    status: plan === 'FREE' ? 'free' : 'active',
-    plan,
-    cancelAtPeriodEnd: false
-  }
-}
-
-interface MockUser {
-  email: string
-  name?: string
-  subscription?: Subscription
-  quota?: number
-  llmCallsThisMonth?: number
-  llmCallsResetAt?: Date
-}
+const stripeService = await import('../services/stripeService')
 
 describe('checkSubscriptionLimits middleware', () => {
-  let mockRequest: { user?: MockUser }
+  let mockRequest: { user?: { email: string, subscription?: { plan: 'FREE' | 'PRO' | 'ENTERPRISE' }, quota?: number } }
   let mockResponse: Partial<Response>
   let nextFunction: Mock
-  let mockFindOne: MockedFunction<any>
 
   beforeEach(() => {
-    mockRequest = {}
+    mockRequest = {} as any
     mockResponse = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis()
     }
     nextFunction = vi.fn()
-    mockFindOne = users.findOne as MockedFunction<any>
     vi.clearAllMocks()
   })
 
   describe('checkLlmLimit', () => {
     it('should return 401 if user is not authenticated', async () => {
-      mockRequest.user = undefined
-
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
       expect(mockResponse.status).toHaveBeenCalledWith(401)
@@ -75,229 +49,117 @@ describe('checkSubscriptionLimits middleware', () => {
       expect(nextFunction).not.toHaveBeenCalled()
     })
 
-    it('should call next() for ENTERPRISE plan (unlimited calls)', async () => {
-      const user: MockUser = {
-        email: 'enterprise@test.com',
-        subscription: createSubscription('ENTERPRISE')
+    it('should call next() when AI access is allowed', async () => {
+      mockRequest.user = {
+        email: 'pro@test.com',
+        subscription: { plan: 'PRO' }
       }
-      mockRequest.user = user
-
-      await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
-
-      expect(nextFunction).toHaveBeenCalled()
-      expect(mockFindOne).not.toHaveBeenCalled()
-      expect(mockResponse.status).not.toHaveBeenCalled()
-    })
-
-    it('should call next() when LLM limit is not exceeded', async () => {
-      const user: MockUser = {
-        email: 'free@test.com',
-        subscription: createSubscription('FREE')
-      }
-      mockRequest.user = user
-
-      mockFindOne.mockResolvedValue({
-        llmCallsThisMonth: 5,
-        llmCallsResetAt: new Date(),
-        email: 'free@test.com'
+      vi.mocked(stripeService.getAiAccessDecision).mockResolvedValue({
+        success: true,
+        data: {
+          allowed: true,
+          plan: 'PRO',
+          limit: 200,
+          currentCount: 12,
+          resetAt: new Date()
+        }
       })
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockFindOne).toHaveBeenCalledWith({ email: 'free@test.com' })
+      expect(stripeService.getAiAccessDecision).toHaveBeenCalledWith('pro@test.com')
       expect(nextFunction).toHaveBeenCalled()
       expect(mockResponse.status).not.toHaveBeenCalled()
     })
 
-    it('should return 429 when LLM limit is exceeded', async () => {
-      const user: MockUser = {
+    it('should return 403 when FREE plan tries to use AI', async () => {
+      mockRequest.user = {
         email: 'free@test.com',
-        subscription: createSubscription('FREE')
+        subscription: { plan: 'FREE' }
       }
-      mockRequest.user = user
-
-      mockFindOne.mockResolvedValue({
-        llmCallsThisMonth: 20,
-        llmCallsResetAt: new Date(),
-        email: 'free@test.com'
+      vi.mocked(stripeService.getAiAccessDecision).mockResolvedValue({
+        success: true,
+        data: {
+          allowed: false,
+          plan: 'FREE',
+          limit: 0,
+          currentCount: 0,
+          resetAt: new Date(),
+          statusCode: 403,
+          message: 'La IA no está disponible en el plan FREE. Actualiza al plan PRO para usar esta función.'
+        }
       })
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockFindOne).toHaveBeenCalledWith({ email: 'free@test.com' })
-      expect(mockResponse.status).toHaveBeenCalledWith(429)
+      expect(mockResponse.status).toHaveBeenCalledWith(403)
       expect(mockResponse.json).toHaveBeenCalledWith({
-        error: 'LLM call limit exceeded',
-        message: 'You have reached your monthly limit of 20 LLM calls. Upgrade your plan for more.',
-        limit: 20,
+        error: 'AI access denied',
+        message: 'La IA no está disponible en el plan FREE. Actualiza al plan PRO para usar esta función.',
+        limit: 0,
         plan: 'FREE'
       })
       expect(nextFunction).not.toHaveBeenCalled()
     })
 
-    it('should default to FREE plan if subscription is undefined', async () => {
-      const user: MockUser = {
-        email: 'noplan@test.com'
+    it('should return 403 when PRO billing-period limit is exceeded', async () => {
+      mockRequest.user = {
+        email: 'pro@test.com',
+        subscription: { plan: 'PRO' }
       }
-      mockRequest.user = user
-
-      mockFindOne.mockResolvedValue({
-        llmCallsThisMonth: 1,
-        llmCallsResetAt: new Date(),
-        email: 'noplan@test.com'
+      vi.mocked(stripeService.getAiAccessDecision).mockResolvedValue({
+        success: true,
+        data: {
+          allowed: false,
+          plan: 'PRO',
+          limit: 200,
+          currentCount: 200,
+          resetAt: new Date(),
+          statusCode: 403,
+          message: 'Has alcanzado el límite de 200 llamadas de IA en tu periodo de facturación actual. Actualiza tu plan para continuar.'
+        }
       })
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockFindOne).toHaveBeenCalledWith({ email: 'noplan@test.com' })
-      expect(nextFunction).toHaveBeenCalled()
+      expect(mockResponse.status).toHaveBeenCalledWith(403)
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        error: 'AI access denied',
+        message: 'Has alcanzado el límite de 200 llamadas de IA en tu periodo de facturación actual. Actualiza tu plan para continuar.',
+        limit: 200,
+        plan: 'PRO'
+      })
+      expect(nextFunction).not.toHaveBeenCalled()
     })
 
-    it('should allow if new month reset applies', async () => {
-      const user: MockUser = {
-        email: 'reset@test.com',
-        subscription: createSubscription('FREE')
+    it('should return 500 when access lookup fails', async () => {
+      mockRequest.user = {
+        email: 'error@test.com',
+        subscription: { plan: 'PRO' }
       }
-      mockRequest.user = user
-
-      // Date from last month
-      const lastMonth = new Date()
-      lastMonth.setMonth(lastMonth.getMonth() - 1)
-
-      mockFindOne.mockResolvedValue({
-        llmCallsThisMonth: 25, // Over limit
-        llmCallsResetAt: lastMonth,
-        email: 'reset@test.com'
+      vi.mocked(stripeService.getAiAccessDecision).mockResolvedValue({
+        success: false,
+        error: 'Error checking AI access'
       })
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
-      expect(mockFindOne).toHaveBeenCalledWith({ email: 'reset@test.com' })
-      expect(nextFunction).toHaveBeenCalled()
-      expect(mockResponse.status).not.toHaveBeenCalled()
+      expect(mockResponse.status).toHaveBeenCalledWith(500)
+      expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Error checking AI access' })
+      expect(nextFunction).not.toHaveBeenCalled()
     })
 
     it('should call next(error) when an exception occurs', async () => {
-      const testError = new Error('Database connection failed')
-      const user: MockUser = {
+      const testError = new Error('Unexpected error')
+      mockRequest.user = {
         email: 'error@test.com',
-        subscription: createSubscription('FREE')
+        subscription: { plan: 'PRO' }
       }
-      mockRequest.user = user
-
-      mockFindOne.mockRejectedValue(testError)
+      vi.mocked(stripeService.getAiAccessDecision).mockRejectedValue(testError)
 
       await checkLlmLimit(mockRequest as Request, mockResponse as Response, nextFunction)
 
       expect(nextFunction).toHaveBeenCalledWith(testError)
     })
   })
-
-  // describe('checkStorageLimit', () => {
-  //   it('should return 401 if user is not authenticated', async () => {
-  //     mockRequest.user = undefined
-
-  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
-
-  //     expect(mockResponse.status).toHaveBeenCalledWith(401)
-  //     expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Unauthorized' })
-  //     expect(nextFunction).not.toHaveBeenCalled()
-  //   })
-
-  //   it('should call next() when storage is below limit', async () => {
-  //     const user: MockUser = {
-  //       email: 'free@test.com',
-  //       subscription: createSubscription('FREE'),
-  //       quota: 30 * 1024 * 1024 // 30MB in bytes
-  //     }
-  //     mockRequest.user = user
-
-  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
-
-  //     expect(nextFunction).toHaveBeenCalled()
-  //     expect(mockResponse.status).not.toHaveBeenCalled()
-  //   })
-
-  //   it('should return 429 when storage limit is reached', async () => {
-  //     const user: MockUser = {
-  //       email: 'free@test.com',
-  //       subscription: createSubscription('FREE'),
-  //       quota: 50 * 1024 * 1024 // 50MB in bytes
-  //     }
-  //     mockRequest.user = user
-
-  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
-
-  //     expect(mockResponse.status).toHaveBeenCalledWith(429)
-  //     expect(mockResponse.json).toHaveBeenCalledWith({
-  //       error: 'Storage limit exceeded',
-  //       message: 'You have reached your storage limit of 50 MB. Upgrade your plan for more storage.',
-  //       currentMB: 50,
-  //       limitMB: 50,
-  //       plan: 'FREE'
-  //     })
-  //     expect(nextFunction).not.toHaveBeenCalled()
-  //   })
-
-  //   it('should return 429 when storage exceeds limit', async () => {
-  //     const user: MockUser = {
-  //       email: 'free@test.com',
-  //       subscription: createSubscription('FREE'),
-  //       quota: 60 * 1024 * 1024 // 60MB in bytes
-  //     }
-  //     mockRequest.user = user
-
-  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
-
-  //     expect(mockResponse.status).toHaveBeenCalledWith(429)
-  //     expect(mockResponse.json).toHaveBeenCalledWith({
-  //       error: 'Storage limit exceeded',
-  //       message: 'You have reached your storage limit of 50 MB. Upgrade your plan for more storage.',
-  //       currentMB: 60,
-  //       limitMB: 50,
-  //       plan: 'FREE'
-  //     })
-  //     expect(nextFunction).not.toHaveBeenCalled()
-  //   })
-
-  //   it('should default to quota 0 if undefined', async () => {
-  //     const user: MockUser = {
-  //       email: 'newuser@test.com',
-  //       subscription: createSubscription('FREE')
-  //     }
-  //     mockRequest.user = user
-
-  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
-
-  //     expect(nextFunction).toHaveBeenCalled()
-  //     expect(mockResponse.status).not.toHaveBeenCalled()
-  //   })
-
-  //   it('should allow PRO users with higher storage limits', async () => {
-  //     const user: MockUser = {
-  //       email: 'pro@test.com',
-  //       subscription: createSubscription('PRO'),
-  //       quota: 3000 * 1024 * 1024 // 3000MB in bytes
-  //     }
-  //     mockRequest.user = user
-
-  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
-
-  //     expect(nextFunction).toHaveBeenCalled()
-  //     expect(mockResponse.status).not.toHaveBeenCalled()
-  //   })
-
-  //   it('should call next(error) when an exception occurs', async () => {
-  //     const testError = new Error('Unexpected error')
-  //     // Force an error by making the user getter throw
-  //     Object.defineProperty(mockRequest, 'user', {
-  //       get: () => { throw testError },
-  //       configurable: true
-  //     })
-
-  //     await checkStorageLimit(mockRequest as Request, mockResponse as Response, nextFunction)
-
-  //     expect(nextFunction).toHaveBeenCalledWith(testError)
-  //   })
-  // })
 })

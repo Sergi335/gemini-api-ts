@@ -61,6 +61,17 @@ export class categoriesController {
       if (user === undefined || user === null || user === '') {
         return res.status(401).json({ ...constants.API_FAIL_RESPONSE, error: constants.API_NOT_USER_MESSAGE })
       }
+      const plan = req.user?.subscription?.plan ?? 'FREE'
+      if (plan === 'FREE') {
+        const categoryCount = await categoryModel.getCategoryCount({ user })
+        const currentCategoryCount = typeof categoryCount === 'number' ? categoryCount : 0
+        if (currentCategoryCount >= 20) {
+          return res.status(403).json({
+            ...constants.API_FAIL_RESPONSE,
+            error: 'Límite de categorías alcanzado, actualiza al plan PRO para crear más.'
+          })
+        }
+      }
       const fields = req.body
       const category = await categoryModel.createCategory({ user, fields })
       return res.status(201).json({ ...constants.API_SUCCESS_RESPONSE, data: category })

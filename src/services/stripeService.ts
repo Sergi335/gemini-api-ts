@@ -9,23 +9,175 @@ export interface StripeServiceResult<T = unknown> {
   error?: string
 }
 
+export interface NormalizedMonthlyLlmUsage {
+  currentCount: number
+  resetAt: Date
+  shouldPersistReset: boolean
+}
+
+export interface LlmUsageStatus {
+  plan: PlanName
+  limit: number
+  currentCount: number
+  resetAt: Date
+}
+
+export interface AiAccessDecision extends LlmUsageStatus {
+  allowed: boolean
+  statusCode?: number
+  message?: string
+}
+
+function getNormalizedMonthlyLlmUsage (user: {
+  llmCallsThisMonth?: number
+  llmCallsResetAt?: Date
+  subscription?: {
+    currentPeriodEnd?: Date
+  }
+}): NormalizedMonthlyLlmUsage {
+  const resetAt = user.llmCallsResetAt
+  const currentCount = user.llmCallsThisMonth ?? 0
+  const currentPeriodEnd = user.subscription?.currentPeriodEnd
+
+  if (currentPeriodEnd != null) {
+    const periodEnd = new Date(currentPeriodEnd)
+    const periodStart = new Date(periodEnd)
+    periodStart.setMonth(periodStart.getMonth() - 1)
+
+    if (resetAt == null || resetAt < periodStart || resetAt > periodEnd) {
+      return {
+        currentCount: 0,
+        resetAt: periodStart,
+        shouldPersistReset: true
+      }
+    }
+
+    return {
+      currentCount,
+      resetAt,
+      shouldPersistReset: false
+    }
+  }
+
+  const now = new Date()
+  if (resetAt == null || now.getMonth() !== resetAt.getMonth() || now.getFullYear() !== resetAt.getFullYear()) {
+    return {
+      currentCount: 0,
+      resetAt: now,
+      shouldPersistReset: true
+    }
+  }
+
+  return {
+    currentCount,
+    resetAt,
+    shouldPersistReset: false
+  }
+}
+
+export async function getLlmUsageStatus (email: string): Promise<StripeServiceResult<LlmUsageStatus>> {
+  try {
+    const user = await users.findOne({ email })
+    if (user == null) {
+      return { success: false, error: 'User not found' }
+    }
+
+    const plan: PlanName = (user.subscription?.plan as PlanName) ?? 'FREE'
+    const limit = PLANS[plan].limits.llmCallsPerMonth
+    const normalizedUsage = getNormalizedMonthlyLlmUsage(user)
+
+    if (normalizedUsage.shouldPersistReset) {
+      await users.findOneAndUpdate(
+        { email },
+        {
+          llmCallsThisMonth: 0,
+          llmCallsResetAt: normalizedUsage.resetAt
+        }
+      )
+    }
+
+    return {
+      success: true,
+      data: {
+        plan,
+        limit,
+        currentCount: normalizedUsage.currentCount,
+        resetAt: normalizedUsage.resetAt
+      }
+    }
+  } catch (error) {
+    console.error('Error getting LLM usage status:', error)
+    return { success: false, error: 'Error getting LLM usage status' }
+  }
+}
+
+export async function getAiAccessDecision (email: string): Promise<StripeServiceResult<AiAccessDecision>> {
+  const usageStatus = await getLlmUsageStatus(email)
+  if (!usageStatus.success || usageStatus.data == null) {
+    return {
+      success: false,
+      error: usageStatus.error ?? 'Error getting AI access decision'
+    }
+  }
+
+  const { plan, limit, currentCount, resetAt } = usageStatus.data
+
+  if (plan === 'FREE') {
+    return {
+      success: true,
+      data: {
+        allowed: false,
+        plan,
+        limit,
+        currentCount,
+        resetAt,
+        statusCode: 403,
+        message: 'La IA no está disponible en el plan FREE. Actualiza al plan PRO para usar esta función.'
+      }
+    }
+  }
+
+  if (limit !== -1 && currentCount >= limit) {
+    return {
+      success: true,
+      data: {
+        allowed: false,
+        plan,
+        limit,
+        currentCount,
+        resetAt,
+        statusCode: 403,
+        message: `Has alcanzado el límite de ${limit} llamadas de IA en tu periodo de facturación actual. Actualiza tu plan para continuar.`
+      }
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      allowed: true,
+      plan,
+      limit,
+      currentCount,
+      resetAt
+    }
+  }
+}
+
 /**
  * Gets or creates a Stripe customer for the user
  */
 export async function getOrCreateCustomer (user: User): Promise<StripeServiceResult<string>> {
   try {
-    // If user already has a Stripe customer ID, return it
     if (user.stripeCustomerId != null) {
       return { success: true, data: user.stripeCustomerId }
     }
 
-    // Check database again to be sure (in case the user object is stale)
     const dbUser = await users.findOne({ email: user.email })
     if (dbUser?.stripeCustomerId != null) {
       return { success: true, data: dbUser.stripeCustomerId }
     }
 
-    // Create a new Stripe customer
     const customer = await stripe.customers.create({
       email: user.email,
       name: user.name ?? user.realName ?? undefined,
@@ -34,7 +186,6 @@ export async function getOrCreateCustomer (user: User): Promise<StripeServiceRes
       }
     })
 
-    // Save the customer ID to the user
     await users.findOneAndUpdate(
       { email: user.email },
       { stripeCustomerId: customer.id }
@@ -103,22 +254,17 @@ export async function createPortalSession (
   }
 }
 
-/**
- * Handles successful checkout completion
- */
 async function handleCheckoutCompleted (session: Stripe.Checkout.Session): Promise<void> {
   const customerId = session.customer as string
   const subscriptionId = session.subscription as string
 
-  // Get the subscription to find the price
   const subscription = await stripe.subscriptions.retrieve(subscriptionId)
   const priceId = subscription.items.data[0]?.price.id
   const plan = priceId != null ? getPlanByPriceId(priceId) : 'PRO'
 
-  // Access current_period_end from the subscription object
   const periodEnd = typeof subscription === 'object' && 'current_period_end' in subscription
     ? (subscription as { current_period_end: number }).current_period_end
-    : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60 // Default to 30 days
+    : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
 
   const cancelAtPeriodEnd = typeof subscription === 'object' && 'cancel_at_period_end' in subscription
     ? (subscription as { cancel_at_period_end: boolean }).cancel_at_period_end
@@ -140,9 +286,6 @@ async function handleCheckoutCompleted (session: Stripe.Checkout.Session): Promi
   console.log(`Subscription activated for customer ${customerId}: ${plan ?? 'PRO'}`)
 }
 
-/**
- * Handles subscription updates
- */
 async function handleSubscriptionUpdated (subscription: Stripe.Subscription): Promise<void> {
   const customerId = subscription.customer as string
   const priceId = subscription.items.data[0]?.price.id
@@ -155,7 +298,6 @@ async function handleSubscriptionUpdated (subscription: Stripe.Subscription): Pr
     status = 'canceled'
   }
 
-  // Access current_period_end from the subscription object
   const periodEnd = typeof subscription === 'object' && 'current_period_end' in subscription
     ? (subscription as unknown as { current_period_end: number }).current_period_end
     : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
@@ -180,9 +322,6 @@ async function handleSubscriptionUpdated (subscription: Stripe.Subscription): Pr
   console.log(`Subscription updated for customer ${customerId}: status=${status}, plan=${plan ?? 'FREE'}`)
 }
 
-/**
- * Handles subscription deletion
- */
 async function handleSubscriptionDeleted (subscription: Stripe.Subscription): Promise<void> {
   const customerId = subscription.customer as string
 
@@ -202,9 +341,6 @@ async function handleSubscriptionDeleted (subscription: Stripe.Subscription): Pr
   console.log(`Subscription canceled for customer ${customerId}, reverted to FREE`)
 }
 
-/**
- * Handles failed payment
- */
 async function handlePaymentFailed (invoice: Stripe.Invoice): Promise<void> {
   const customerId = invoice.customer as string
 
@@ -218,9 +354,6 @@ async function handlePaymentFailed (invoice: Stripe.Invoice): Promise<void> {
   console.log(`Payment failed for customer ${customerId}`)
 }
 
-/**
- * Handles Stripe webhook events
- */
 export async function handleWebhookEvent (event: Stripe.Event): Promise<StripeServiceResult> {
   try {
     switch (event.type) {
@@ -255,9 +388,6 @@ export async function handleWebhookEvent (event: Stripe.Event): Promise<StripeSe
   }
 }
 
-/**
- * Gets user subscription status
- */
 export async function getSubscriptionStatus (email: string): Promise<StripeServiceResult<{
   status: string
   plan: PlanName
@@ -276,6 +406,10 @@ export async function getSubscriptionStatus (email: string): Promise<StripeServi
 
     const plan: PlanName = (user.subscription?.plan as PlanName) ?? 'FREE'
     const limits = PLANS[plan].limits
+    const usageStatus = await getLlmUsageStatus(email)
+    if (!usageStatus.success || usageStatus.data == null) {
+      return { success: false, error: usageStatus.error ?? 'Error getting LLM usage status' }
+    }
 
     return {
       success: true,
@@ -286,8 +420,8 @@ export async function getSubscriptionStatus (email: string): Promise<StripeServi
         cancelAtPeriodEnd: user.subscription?.cancelAtPeriodEnd ?? false,
         limits,
         remainingQuota: limits.storageMB - ((user.quota ?? 0) / (1024 * 1024)),
-        llmCallsThisMonth: user.llmCallsThisMonth,
-        llmCallsResetAt: user.llmCallsResetAt
+        llmCallsThisMonth: usageStatus.data.currentCount,
+        llmCallsResetAt: usageStatus.data.resetAt
       }
     }
   } catch (error) {
@@ -296,35 +430,20 @@ export async function getSubscriptionStatus (email: string): Promise<StripeServi
   }
 }
 
-/**
- * Increments LLM call count for the user
- */
 export async function incrementLlmCalls (email: string): Promise<StripeServiceResult<{ count: number, limit: number }>> {
   try {
-    const user = await users.findOne({ email })
-    if (user == null) {
-      return { success: false, error: 'User not found' }
+    const usageStatus = await getLlmUsageStatus(email)
+    if (!usageStatus.success || usageStatus.data == null) {
+      return { success: false, error: usageStatus.error ?? 'Error getting LLM usage status' }
     }
 
-    const plan: PlanName = (user.subscription?.plan as PlanName) ?? 'FREE'
-    const limit = PLANS[plan].limits.llmCallsPerMonth
-
-    // Check if we need to reset the count (new month)
+    const { limit, currentCount } = usageStatus.data
     const now = new Date()
-    const resetAt = user.llmCallsResetAt
-    let currentCount = user.llmCallsThisMonth ?? 0
 
-    if (resetAt == null || now.getMonth() !== resetAt.getMonth() || now.getFullYear() !== resetAt.getFullYear()) {
-      // Reset count for new month
-      currentCount = 0
-    }
-
-    // Check limit (-1 means unlimited)
     if (limit !== -1 && currentCount >= limit) {
       return { success: false, error: 'LLM call limit exceeded' }
     }
 
-    // Increment count
     const newCount = currentCount + 1
     await users.findOneAndUpdate(
       { email },
@@ -341,9 +460,6 @@ export async function incrementLlmCalls (email: string): Promise<StripeServiceRe
   }
 }
 
-/**
- * Verifies Stripe webhook signature
- */
 export function constructWebhookEvent (payload: Buffer, signature: string): Stripe.Event | null {
   try {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET

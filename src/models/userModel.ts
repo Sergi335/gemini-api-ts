@@ -1,7 +1,7 @@
 import mongoose from 'mongoose'
 import { User, UserUpdateFields } from '../types/userModel.types'
-import category from './schemas/categorySchema'
 import { categoryModel } from './categoryModel'
+import category from './schemas/categorySchema'
 import link from './schemas/linkSchema'
 import users from './schemas/userSchema'
 // import { createRequire } from 'node:module'
@@ -44,8 +44,10 @@ export class userModel {
           stripeCustomerId: data.stripeCustomerId,
           subscription: data.subscription,
           llmCallsThisMonth: data.llmCallsThisMonth,
-          llmCallsResetAt: data.llmCallsResetAt
+          llmCallsResetAt: data.llmCallsResetAt,
+          createdAt: data.createdAt
         }
+        console.log('🚀 ~ userModel ~ getUser ~ userData:', userData)
         return userData
       } else {
         return { error: 'El usuario no existe' }
