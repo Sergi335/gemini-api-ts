@@ -115,6 +115,12 @@ export async function createPortal (req: Request, res: Response): Promise<void> 
 export async function handleWebhook (req: Request, res: Response): Promise<void> {
   try {
     const signature = req.headers['stripe-signature'] as string
+    console.log('[stripe] controller.handleWebhook:request', {
+      hasSignature: signature != null,
+      contentType: req.headers['content-type'],
+      bodyType: Buffer.isBuffer(req.body) ? 'buffer' : typeof req.body
+    })
+
     if (signature == null) {
       res.status(400).json({ error: 'Missing stripe-signature header' })
       return
@@ -128,6 +134,11 @@ export async function handleWebhook (req: Request, res: Response): Promise<void>
       return
     }
 
+    console.log('[stripe] controller.handleWebhook:event-constructed', {
+      eventId: event.id,
+      eventType: event.type
+    })
+
     // Handle the event
     const result = await stripeService.handleWebhookEvent(event)
     if (!result.success) {
@@ -135,6 +146,11 @@ export async function handleWebhook (req: Request, res: Response): Promise<void>
       res.status(500).json({ error: result.error })
       return
     }
+
+    console.log('[stripe] controller.handleWebhook:success', {
+      eventId: event.id,
+      eventType: event.type
+    })
 
     res.json({ received: true })
   } catch (error) {

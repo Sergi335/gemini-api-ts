@@ -464,7 +464,7 @@ describe('Categories Integration Tests', () => {
         .expect(403)
 
       expect(response.body.success).toBe(false)
-      expect(response.body.error).toBe('Límite de categorías alcanzado, actualiza al plan PRO para crear más.')
+      expect(response.body.message).toBe('Límite de categorías alcanzado, actualiza al plan PRO para crear más.')
     })
   })
 })

@@ -68,7 +68,7 @@ export class categoriesController {
         if (currentCategoryCount >= 20) {
           return res.status(403).json({
             ...constants.API_FAIL_RESPONSE,
-            error: 'Límite de categorías alcanzado, actualiza al plan PRO para crear más.'
+            message: 'Límite de categorías alcanzado, actualiza al plan PRO para crear más.'
           })
         }
       }

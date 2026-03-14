@@ -196,6 +196,8 @@ describe('Stripe Service', () => {
       // Mock subscription retrieval
       vi.mocked(stripe.subscriptions.retrieve).mockResolvedValue({
         id: 'sub_123',
+        customer: 'cus_123',
+        status: 'active',
         items: { data: [{ price: { id: 'price_pro' } }] },
         current_period_end: 1234567890,
         cancel_at_period_end: false
@@ -211,12 +213,13 @@ describe('Stripe Service', () => {
       expect(result.success).toBe(true)
       expect(users.findOneAndUpdate).toHaveBeenCalledWith(
         { stripeCustomerId: 'cus_123' },
-        expect.objectContaining({
+        {
           subscription: expect.objectContaining({
             status: 'active',
+            plan: 'PRO',
             stripeSubscriptionId: 'sub_123'
           })
-        })
+        }
       )
     })
 
@@ -268,6 +271,43 @@ describe('Stripe Service', () => {
           subscription: expect.objectContaining({
             status: 'free',
             plan: 'FREE'
+          })
+        })
+      )
+    })
+
+    it('should handle invoice.paid by refreshing the subscription from Stripe', async () => {
+      const event = {
+        type: 'invoice.paid',
+        data: {
+          object: {
+            customer: 'cus_123',
+            subscription: 'sub_renewed_123'
+          }
+        }
+      } as any
+
+      vi.mocked(stripe.subscriptions.retrieve).mockResolvedValue({
+        id: 'sub_renewed_123',
+        customer: 'cus_123',
+        status: 'active',
+        items: { data: [{ price: { id: 'price_pro' } }] },
+        current_period_end: 2234567890,
+        cancel_at_period_end: false
+      } as any)
+
+      const result = await stripeService.handleWebhookEvent(event)
+
+      expect(result.success).toBe(true)
+      expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_renewed_123')
+      expect(users.findOneAndUpdate).toHaveBeenCalledWith(
+        { stripeCustomerId: 'cus_123' },
+        expect.objectContaining({
+          subscription: expect.objectContaining({
+            status: 'active',
+            plan: 'PRO',
+            stripeSubscriptionId: 'sub_renewed_123',
+            cancelAtPeriodEnd: false
           })
         })
       )

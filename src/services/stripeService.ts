@@ -28,6 +28,91 @@ export interface AiAccessDecision extends LlmUsageStatus {
   message?: string
 }
 
+function getSubscriptionPeriodEnd (subscription: Stripe.Subscription): Date {
+  const periodEnd = typeof subscription === 'object' && 'current_period_end' in subscription
+    ? (subscription as unknown as { current_period_end: number }).current_period_end
+    : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
+
+  return new Date(periodEnd * 1000)
+}
+
+function getSubscriptionCancelAtPeriodEnd (subscription: Stripe.Subscription): boolean {
+  return typeof subscription === 'object' && 'cancel_at_period_end' in subscription
+    ? (subscription as unknown as { cancel_at_period_end: boolean }).cancel_at_period_end
+    : false
+}
+
+function getSubscriptionStatusValue (subscription: Stripe.Subscription): 'active' | 'past_due' | 'canceled' {
+  if (subscription.status === 'past_due') {
+    return 'past_due'
+  }
+
+  if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
+    return 'canceled'
+  }
+
+  return 'active'
+}
+
+async function persistSubscriptionState (subscription: Stripe.Subscription, fallbackPlan: PlanName): Promise<void> {
+  const customerId = subscription.customer as string
+  const priceId = subscription.items.data[0]?.price.id
+  const mappedPlan = priceId != null ? getPlanByPriceId(priceId) : null
+  const existingUser = await users.findOne({ stripeCustomerId: customerId })
+  const currentPlan = existingUser?.subscription?.plan as PlanName | undefined
+  const plan = mappedPlan ?? currentPlan ?? fallbackPlan
+  const status = getSubscriptionStatusValue(subscription)
+  const currentPeriodEnd = getSubscriptionPeriodEnd(subscription)
+  const cancelAtPeriodEnd = getSubscriptionCancelAtPeriodEnd(subscription)
+
+  console.log('[stripe] persistSubscriptionState:start', {
+    customerId,
+    subscriptionId: subscription.id,
+    stripeStatus: subscription.status,
+    localStatus: status,
+    priceId,
+    mappedPlan,
+    currentPlan,
+    fallbackPlan,
+    finalPlan: plan,
+    currentPeriodEnd: currentPeriodEnd.toISOString(),
+    cancelAtPeriodEnd,
+    hasExistingUser: existingUser != null,
+    existingUserEmail: existingUser?.email
+  })
+
+  const updatedUser = await users.findOneAndUpdate(
+    { stripeCustomerId: customerId },
+    {
+      subscription: {
+        status,
+        plan: plan ?? fallbackPlan,
+        stripeSubscriptionId: subscription.id,
+        currentPeriodEnd,
+        cancelAtPeriodEnd
+      }
+    }
+  )
+
+  if (mappedPlan == null) {
+    console.warn(`Stripe price ${priceId ?? 'unknown'} is not mapped to a local plan. Preserving plan=${plan}.`)
+  }
+
+  if (updatedUser == null) {
+    console.warn(`No local user found for Stripe customer ${customerId} while syncing subscription ${subscription.id}.`)
+  } else {
+    console.log('[stripe] persistSubscriptionState:updated', {
+      customerId,
+      subscriptionId: subscription.id,
+      updatedUserEmail: updatedUser.email,
+      storedPlan: updatedUser.subscription?.plan,
+      storedStatus: updatedUser.subscription?.status,
+      storedCurrentPeriodEnd: updatedUser.subscription?.currentPeriodEnd,
+      storedCancelAtPeriodEnd: updatedUser.subscription?.cancelAtPeriodEnd
+    })
+  }
+}
+
 function getNormalizedMonthlyLlmUsage (user: {
   llmCallsThisMonth?: number
   llmCallsResetAt?: Date
@@ -255,75 +340,39 @@ export async function createPortalSession (
 }
 
 async function handleCheckoutCompleted (session: Stripe.Checkout.Session): Promise<void> {
-  const customerId = session.customer as string
   const subscriptionId = session.subscription as string
+  console.log('[stripe] webhook:checkout.session.completed', {
+    sessionId: session.id,
+    customerId: session.customer,
+    subscriptionId
+  })
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-  const priceId = subscription.items.data[0]?.price.id
-  const plan = priceId != null ? getPlanByPriceId(priceId) : 'PRO'
+  await persistSubscriptionState(subscription, 'PRO')
 
-  const periodEnd = typeof subscription === 'object' && 'current_period_end' in subscription
-    ? (subscription as { current_period_end: number }).current_period_end
-    : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
-
-  const cancelAtPeriodEnd = typeof subscription === 'object' && 'cancel_at_period_end' in subscription
-    ? (subscription as { cancel_at_period_end: boolean }).cancel_at_period_end
-    : false
-
-  await users.findOneAndUpdate(
-    { stripeCustomerId: customerId },
-    {
-      subscription: {
-        status: 'active',
-        plan: plan ?? 'PRO',
-        stripeSubscriptionId: subscriptionId,
-        currentPeriodEnd: new Date(periodEnd * 1000),
-        cancelAtPeriodEnd
-      }
-    }
-  )
-
-  console.log(`Subscription activated for customer ${customerId}: ${plan ?? 'PRO'}`)
+  console.log(`Subscription activated for customer ${subscription.customer as string}: ${subscriptionId}`)
 }
 
 async function handleSubscriptionUpdated (subscription: Stripe.Subscription): Promise<void> {
-  const customerId = subscription.customer as string
-  const priceId = subscription.items.data[0]?.price.id
-  const plan = priceId != null ? getPlanByPriceId(priceId) : null
+  console.log('[stripe] webhook:customer.subscription.updated', {
+    customerId: subscription.customer,
+    subscriptionId: subscription.id,
+    stripeStatus: subscription.status,
+    priceId: subscription.items.data[0]?.price.id
+  })
 
-  let status: 'active' | 'past_due' | 'canceled' = 'active'
-  if (subscription.status === 'past_due') {
-    status = 'past_due'
-  } else if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
-    status = 'canceled'
-  }
+  await persistSubscriptionState(subscription, 'FREE')
 
-  const periodEnd = typeof subscription === 'object' && 'current_period_end' in subscription
-    ? (subscription as unknown as { current_period_end: number }).current_period_end
-    : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
-
-  const cancelAtPeriodEnd = typeof subscription === 'object' && 'cancel_at_period_end' in subscription
-    ? (subscription as unknown as { cancel_at_period_end: boolean }).cancel_at_period_end
-    : false
-
-  await users.findOneAndUpdate(
-    { stripeCustomerId: customerId },
-    {
-      subscription: {
-        status,
-        plan: plan ?? 'FREE',
-        stripeSubscriptionId: subscription.id,
-        currentPeriodEnd: new Date(periodEnd * 1000),
-        cancelAtPeriodEnd
-      }
-    }
-  )
-
-  console.log(`Subscription updated for customer ${customerId}: status=${status}, plan=${plan ?? 'FREE'}`)
+  console.log(`Subscription updated for customer ${subscription.customer as string}: status=${subscription.status}`)
 }
 
 async function handleSubscriptionDeleted (subscription: Stripe.Subscription): Promise<void> {
   const customerId = subscription.customer as string
+  console.log('[stripe] webhook:customer.subscription.deleted', {
+    customerId,
+    subscriptionId: subscription.id,
+    stripeStatus: subscription.status
+  })
 
   await users.findOneAndUpdate(
     { stripeCustomerId: customerId },
@@ -343,6 +392,10 @@ async function handleSubscriptionDeleted (subscription: Stripe.Subscription): Pr
 
 async function handlePaymentFailed (invoice: Stripe.Invoice): Promise<void> {
   const customerId = invoice.customer as string
+  console.log('[stripe] webhook:invoice.payment_failed', {
+    customerId,
+    invoiceId: invoice.id
+  })
 
   await users.findOneAndUpdate(
     { stripeCustomerId: customerId },
@@ -354,8 +407,35 @@ async function handlePaymentFailed (invoice: Stripe.Invoice): Promise<void> {
   console.log(`Payment failed for customer ${customerId}`)
 }
 
+async function handleInvoicePaid (invoice: Stripe.Invoice): Promise<void> {
+  const subscriptionId = 'subscription' in invoice
+    ? (invoice as Stripe.Invoice & { subscription?: string | null }).subscription
+    : null
+
+  console.log('[stripe] webhook:invoice.paid', {
+    customerId: invoice.customer,
+    invoiceId: invoice.id,
+    subscriptionId
+  })
+
+  if (subscriptionId == null || typeof subscriptionId !== 'string') {
+    console.log('Invoice paid without subscription reference, skipping subscription sync')
+    return
+  }
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+  await persistSubscriptionState(subscription, 'FREE')
+
+  console.log(`Invoice paid for customer ${invoice.customer as string}, subscription synced`)
+}
+
 export async function handleWebhookEvent (event: Stripe.Event): Promise<StripeServiceResult> {
   try {
+    console.log('[stripe] handleWebhookEvent', {
+      eventId: event.id,
+      eventType: event.type
+    })
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object
@@ -375,6 +455,11 @@ export async function handleWebhookEvent (event: Stripe.Event): Promise<StripeSe
       case 'invoice.payment_failed': {
         const invoice = event.data.object
         await handlePaymentFailed(invoice)
+        break
+      }
+      case 'invoice.paid': {
+        const invoice = event.data.object
+        await handleInvoicePaid(invoice)
         break
       }
       default:
@@ -467,6 +552,12 @@ export function constructWebhookEvent (payload: Buffer, signature: string): Stri
       console.error('STRIPE_WEBHOOK_SECRET is not defined')
       return null
     }
+
+    console.log('[stripe] constructWebhookEvent', {
+      payloadLength: payload.length,
+      hasSignature: signature !== '',
+      webhookSecretConfigured: true
+    })
 
     return stripe.webhooks.constructEvent(payload, signature, webhookSecret)
   } catch (error) {

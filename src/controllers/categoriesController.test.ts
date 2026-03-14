@@ -336,7 +336,7 @@ describe('categoriesController', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(403)
       expect(mockResponse.json).toHaveBeenCalledWith({
         ...constants.API_FAIL_RESPONSE,
-        error: 'Límite de categorías alcanzado, actualiza al plan PRO para crear más.'
+        message: 'Límite de categorías alcanzado, actualiza al plan PRO para crear más.'
       })
     })
   })
