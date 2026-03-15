@@ -8,6 +8,33 @@ import { constants } from '../utils/constants'
 
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AIController {
+  private static getMessageFromBody (req: RequestWithUser): string {
+    const body = req.body as { message?: unknown } | undefined
+    return typeof body?.message === 'string' ? body.message : ''
+  }
+
+  private static initializeStream (res: Response): void {
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-cache, no-transform')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('X-Accel-Buffering', 'no')
+    ;(res as Response & { flushHeaders: () => void }).flushHeaders()
+  }
+
+  private static sendStreamEvent (res: Response, event: string, data: unknown): void {
+    res.write(`event: ${event}\n`)
+    res.write(`data: ${JSON.stringify(data)}\n\n`)
+  }
+
+  private static async incrementLlmCallsForUser (email?: string): Promise<void> {
+    if (email == null) return
+
+    const incrementResult = await stripeService.incrementLlmCalls(email)
+    if (!incrementResult.success) {
+      console.warn(`[AIController] Failed to increment LLM calls for ${email}: ${incrementResult.error ?? 'Unknown error'}`)
+    }
+  }
+
   private static async validateAiAccess (req: RequestWithUser, res: Response): Promise<Response | null> {
     const email = req.user?.email
     if (email == null || email === '') {
@@ -32,7 +59,7 @@ export class AIController {
     return null
   }
 
-  static async summarizeLink (req: RequestWithUser, res: Response): Promise<Response> {
+  static async summarizeLink (req: RequestWithUser, res: Response): Promise<Response | undefined> {
     try {
       const user = String(req.user?._id ?? 'unknown')
       const { id } = req.params
@@ -62,6 +89,8 @@ export class AIController {
         return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: linkDoc })
       }
 
+      AIController.initializeStream(res)
+
       let type = typeof linkDoc.type === 'string' ? linkDoc.type : ''
       if (type !== 'video') {
         type = LinkAnalyzer.analyze(url)
@@ -72,13 +101,19 @@ export class AIController {
 
       let summary: string
       if ((type === 'video' || isYouTube) && url !== '') {
-        console.log(`[AIController] Summarizing video directly via URL: ${String(url)}`)
-        summary = await AIService.summarizeVideo(url)
+        console.log(`[AIController] Streaming video summary directly via URL: ${String(url)}`)
+        summary = await AIService.summarizeVideoStream(url, async (chunk) => {
+          AIController.sendStreamEvent(res, 'chunk', { text: chunk })
+        })
       } else {
         if (transcript === '') {
-          return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No transcript available for this link.' })
+          AIController.sendStreamEvent(res, 'error', { error: 'No transcript available for this link.' })
+          res.end()
+          return
         }
-        summary = await AIService.generateSummary(transcript)
+        summary = await AIService.generateSummaryStream(transcript, async (chunk) => {
+          AIController.sendStreamEvent(res, 'chunk', { text: chunk })
+        })
       }
 
       const updatedLink = await linkModel.updateLink({
@@ -89,26 +124,25 @@ export class AIController {
         }]
       })
 
-      const email = req.user?.email
-      if (email != null) {
-        const incrementResult = await stripeService.incrementLlmCalls(email)
-        if (!incrementResult.success) {
-          console.warn(`[AIController] Failed to increment LLM calls for ${email}: ${incrementResult.error ?? 'Unknown error'}`)
-        }
-      }
-
-      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: updatedLink })
+      await AIController.incrementLlmCallsForUser(req.user?.email)
+      AIController.sendStreamEvent(res, 'done', { summary, data: updatedLink })
+      res.end()
     } catch (error) {
       console.error('Error in summarizeLink:', error)
+      if (res.headersSent) {
+        AIController.sendStreamEvent(res, 'error', { error: 'Internal server error' })
+        res.end()
+        return
+      }
       return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Internal server error' })
     }
   }
 
-  static async chatWithLink (req: RequestWithUser, res: Response): Promise<Response> {
+  static async chatWithLink (req: RequestWithUser, res: Response): Promise<Response | undefined> {
     try {
       const user = String(req.user?._id ?? 'unknown')
       const { id } = req.params
-      const { message } = req.body
+      const message = AIController.getMessageFromBody(req)
       console.log(`[AIController] Received chat request for link ID: ${id} by user: ${user}`)
 
       if (user === undefined || user === null || user === '') {
@@ -134,6 +168,8 @@ export class AIController {
       const transcript = typeof linkDoc.transcript === 'string' ? linkDoc.transcript as string : ''
       const history = Array.isArray(linkDoc.chatHistory) ? linkDoc.chatHistory as Array<{ role: 'user' | 'model', content: string }> : []
 
+      AIController.initializeStream(res)
+
       let type = typeof linkDoc.type === 'string' ? linkDoc.type as string : ''
       if (type !== 'video') {
         type = LinkAnalyzer.analyze(url)
@@ -144,13 +180,19 @@ export class AIController {
 
       let responseText: string
       if ((type === 'video' || isYouTube) && url !== '') {
-        console.log(`[AIController] Chatting with video directly via URL: ${url}`)
-        responseText = await AIService.chatWithVideo(url, history, message)
+        console.log(`[AIController] Streaming chat with video directly via URL: ${url}`)
+        responseText = await AIService.chatWithVideoStream(url, history, message, async (chunk) => {
+          AIController.sendStreamEvent(res, 'chunk', { text: chunk })
+        })
       } else {
         if (transcript === '') {
-          return res.status(400).json({ ...constants.API_FAIL_RESPONSE, error: 'No transcript available. Please summarize the article first.' })
+          AIController.sendStreamEvent(res, 'error', { error: 'No transcript available. Please summarize the article first.' })
+          res.end()
+          return
         }
-        responseText = await AIService.chat(transcript, history, message)
+        responseText = await AIService.chatStream(transcript, history, message, async (chunk) => {
+          AIController.sendStreamEvent(res, 'chunk', { text: chunk })
+        })
       }
 
       const newHistory = [
@@ -167,17 +209,16 @@ export class AIController {
         }]
       })
 
-      const email = req.user?.email
-      if (email != null) {
-        const incrementResult = await stripeService.incrementLlmCalls(email)
-        if (!incrementResult.success) {
-          console.warn(`[AIController] Failed to increment LLM calls for ${email}: ${incrementResult.error ?? 'Unknown error'}`)
-        }
-      }
-
-      return res.status(200).json({ ...constants.API_SUCCESS_RESPONSE, data: { answer: responseText, history: newHistory } })
+      await AIController.incrementLlmCallsForUser(req.user?.email)
+      AIController.sendStreamEvent(res, 'done', { answer: responseText, history: newHistory })
+      res.end()
     } catch (error) {
       console.error('Error in chatWithLink:', error)
+      if (res.headersSent) {
+        AIController.sendStreamEvent(res, 'error', { error: 'Internal server error' })
+        res.end()
+        return
+      }
       return res.status(500).json({ ...constants.API_FAIL_RESPONSE, error: 'Internal server error' })
     }
   }

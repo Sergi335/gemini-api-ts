@@ -2,12 +2,12 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { AIService } from './aiService'
 
 // Mock GoogleGenAI
-const mockGenerateContent = vi.fn()
+const mockGenerateContentStream = vi.fn()
 
 vi.mock('@google/genai', () => ({
   GoogleGenAI: vi.fn().mockImplementation(() => ({
     models: {
-      generateContent: mockGenerateContent
+      generateContentStream: mockGenerateContentStream
     }
   }))
 }))
@@ -18,55 +18,47 @@ describe('AIService', () => {
   beforeEach(() => {
     vi.resetModules()
     process.env = { ...originalEnv, GEMINI_API_KEY: 'test-key' }
-    mockGenerateContent.mockReset()
+    mockGenerateContentStream.mockReset()
   })
 
   afterEach(() => {
     process.env = originalEnv
   })
 
-  it('should generate summary successfully', async () => {
-    mockGenerateContent.mockResolvedValue({
-      text: 'Summary text'
+  it('should stream summary successfully', async () => {
+    mockGenerateContentStream.mockResolvedValue((async function * () {
+      yield { text: 'Part 1 ' }
+      yield { text: 'Part 2' }
+    })())
+
+    const chunks: string[] = []
+    const result = await AIService.generateSummaryStream('verify text', (chunk) => {
+      chunks.push(chunk)
     })
 
-    const result = await AIService.generateSummary('verify text')
-    expect(result).toBe('Summary text')
-    expect(mockGenerateContent).toHaveBeenCalled()
+    expect(result).toBe('Part 1 Part 2')
+    expect(chunks).toEqual(['Part 1 ', 'Part 2'])
+    expect(mockGenerateContentStream).toHaveBeenCalled()
   })
 
-  it('should summarize video successfully', async () => {
-    mockGenerateContent.mockResolvedValue({
-      text: 'Video summary'
+  it('should stream chat successfully', async () => {
+    mockGenerateContentStream.mockResolvedValue((async function * () {
+      yield { text: 'Hola ' }
+      yield { text: 'mundo' }
+    })())
+
+    const chunks: string[] = []
+    const result = await AIService.chatStream('context', [], 'msg', (chunk) => {
+      chunks.push(chunk)
     })
 
-    const result = await AIService.summarizeVideo('https://youtube.com/watch?v=test')
-    expect(result).toBe('Video summary')
-    expect(mockGenerateContent).toHaveBeenCalled()
-  })
-
-  it('should chat successfully', async () => {
-    mockGenerateContent.mockResolvedValue({
-      text: 'Chat response'
-    })
-
-    const result = await AIService.chat('context', [], 'msg')
-    expect(result).toBe('Chat response')
-    expect(mockGenerateContent).toHaveBeenCalled()
-  })
-
-  it('should chat with video successfully', async () => {
-    mockGenerateContent.mockResolvedValue({
-      text: 'Video chat response'
-    })
-
-    const result = await AIService.chatWithVideo('https://youtube.com/watch?v=test', [], 'msg')
-    expect(result).toBe('Video chat response')
-    expect(mockGenerateContent).toHaveBeenCalled()
+    expect(result).toBe('Hola mundo')
+    expect(chunks).toEqual(['Hola ', 'mundo'])
+    expect(mockGenerateContentStream).toHaveBeenCalled()
   })
 
   it('should throw error if API key is missing', async () => {
     process.env.GEMINI_API_KEY = ''
-    await expect(AIService.generateSummary('text')).rejects.toThrow('GEMINI_API_KEY is not set')
+    await expect(AIService.generateSummaryStream('text', vi.fn())).rejects.toThrow('GEMINI_API_KEY is not set')
   })
 })

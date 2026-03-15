@@ -38,12 +38,19 @@ describe('AIController', () => {
         llmCallsResetAt: new Date()
       },
       params: { id: 'link-123' },
-      body: {}
+      body: {},
+      query: {},
+      headers: {}
     }
 
     mockResponse = {
       status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis()
+      json: vi.fn().mockReturnThis(),
+      setHeader: vi.fn(),
+      flushHeaders: vi.fn(),
+      write: vi.fn(),
+      end: vi.fn(),
+      headersSent: false
     }
 
     vi.mocked(stripeService.getAiAccessDecision).mockResolvedValue({
@@ -121,7 +128,10 @@ describe('AIController', () => {
       summary: '',
       type: 'article'
     } as any)
-    vi.mocked(AIService.generateSummary).mockResolvedValue('Resumen')
+    vi.mocked(AIService.generateSummaryStream).mockImplementation(async (_text, onChunk) => {
+      await onChunk('Resumen')
+      return 'Resumen'
+    })
     vi.mocked(linkModel.updateLink).mockResolvedValue([{ summary: 'Resumen' }] as any)
     vi.mocked(stripeService.incrementLlmCalls).mockResolvedValue({
       success: true,
@@ -133,8 +143,38 @@ describe('AIController', () => {
       mockResponse as Response
     )
 
-    expect(AIService.generateSummary).toHaveBeenCalledWith('Texto de prueba')
+    expect(AIService.generateSummaryStream).toHaveBeenCalledWith('Texto de prueba', expect.any(Function))
+    expect(mockResponse.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream; charset=utf-8')
+    expect(mockResponse.write).toHaveBeenCalledWith('event: chunk\n')
+    expect(mockResponse.write).toHaveBeenCalledWith('data: {"text":"Resumen"}\n\n')
+    expect(mockResponse.end).toHaveBeenCalled()
+  })
+
+  it('returns existing summary from database without streaming', async () => {
+    vi.mocked(linkModel.getLinkById).mockResolvedValue({
+      url: 'https://example.com',
+      transcript: 'Texto de prueba',
+      summary: 'Resumen ya guardado',
+      type: 'article'
+    } as any)
+
+    await AIController.summarizeLink(
+      mockRequest as RequestWithUser,
+      mockResponse as Response
+    )
+
+    expect(AIService.generateSummaryStream).not.toHaveBeenCalled()
     expect(mockResponse.status).toHaveBeenCalledWith(200)
+    expect(mockResponse.json).toHaveBeenCalledWith({
+      ...constants.API_SUCCESS_RESPONSE,
+      data: {
+        url: 'https://example.com',
+        transcript: 'Texto de prueba',
+        summary: 'Resumen ya guardado',
+        type: 'article'
+      }
+    })
+    expect(mockResponse.setHeader).not.toHaveBeenCalled()
   })
 
   it('returns 500 if AI access check fails', async () => {
@@ -153,5 +193,40 @@ describe('AIController', () => {
       ...constants.API_FAIL_RESPONSE,
       error: 'Error checking AI access'
     })
+  })
+
+  it('streams chat response in chunks when requested', async () => {
+    mockRequest.body = { message: 'Hello' }
+
+    vi.mocked(linkModel.getLinkById).mockResolvedValue({
+      url: 'https://example.com',
+      transcript: 'Texto de prueba',
+      chatHistory: [],
+      type: 'article'
+    } as any)
+
+    vi.mocked(AIService.chatStream).mockImplementation(async (_context, _history, _message, onChunk) => {
+      await onChunk('Hola ')
+      await onChunk('mundo')
+      return 'Hola mundo'
+    })
+
+    vi.mocked(linkModel.updateLink).mockResolvedValue([{ chatHistory: [] }] as any)
+    vi.mocked(stripeService.incrementLlmCalls).mockResolvedValue({
+      success: true,
+      data: { count: 1, limit: 200 }
+    })
+
+    await AIController.chatWithLink(
+      mockRequest as RequestWithUser,
+      mockResponse as Response
+    )
+
+    expect(mockResponse.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream; charset=utf-8')
+    expect(mockResponse.write).toHaveBeenCalledWith('event: chunk\n')
+    expect(mockResponse.write).toHaveBeenCalledWith('data: {"text":"Hola "}\n\n')
+    expect(mockResponse.write).toHaveBeenCalledWith('data: {"text":"mundo"}\n\n')
+    expect(mockResponse.write).toHaveBeenCalledWith(`data: ${JSON.stringify({ answer: 'Hola mundo', history: [{ role: 'user', content: 'Hello' }, { role: 'model', content: 'Hola mundo' }] })}\n\n`)
+    expect(mockResponse.end).toHaveBeenCalled()
   })
 })
