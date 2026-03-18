@@ -153,7 +153,11 @@ export const getLinkStatusLocal = async ({ url }: { url: string }): Promise<{ st
       status = 'success'
     } else if (statusCode >= 300 && statusCode <= 399) {
       status = 'redirect'
-    } else if (statusCode >= 400 && statusCode <= 499) {
+    } else if (statusCode >= 400 && statusCode <= 403) {
+      status = 'clientErr'
+    } else if (statusCode === 404) {
+      status = 'notFound'
+    } else if (statusCode >= 405 && statusCode <= 499) {
       status = 'clientErr'
     } else if (statusCode >= 500 && statusCode <= 599) {
       status = 'serverErr'
@@ -179,7 +183,11 @@ export const getLinkStatusLocal = async ({ url }: { url: string }): Promise<{ st
         status = 'success'
       } else if (statusCode >= 300 && statusCode <= 399) {
         status = 'redirect'
-      } else if (statusCode >= 400 && statusCode <= 499) {
+      } else if (statusCode >= 400 && statusCode <= 403) {
+        status = 'clientErr'
+      } else if (statusCode === 404) {
+        status = 'notFound'
+      } else if (statusCode >= 405 && statusCode <= 499) {
         status = 'clientErr'
       } else if (statusCode >= 500 && statusCode <= 599) {
         status = 'serverErr'
